@@ -22,7 +22,7 @@
 
 - **What it is** — a service that **digitally signs** software artifacts (firmware, packages, documents) and lets anyone **verify** them later.
 - **How it works** — you send a **hash** of your file (not the file itself); the service signs that hash with a hardware-protected key and returns a small, portable **proof** you can verify anywhere — even offline.
-- **What makes it different** — **post-quantum** signatures (FIPS 204), a trust chain valid for **50 years**, and private keys that **never leave the hardware**.
+- **What makes it different** — **post-quantum** *and* **hybrid** (classical + PQC) signatures, a trust chain valid for **50 years**, and private keys that **never leave the hardware**.
 - **See it now** — [**live dashboard**](https://www.rayketcham.com/CRLs/tailnumber/db/) · [API docs](https://www.rayketcham.com/CRLs/tailnumber/docs)
 
 ---
@@ -83,7 +83,8 @@ New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkt
 
 | | |
 |---|---|
-| 🔮 **Post-quantum** | ML-DSA-65 / ML-DSA-87 (FIPS 204), plus classical RSA-3072 and ECDSA P-384. |
+| 🔮 **Post-quantum** | ML-DSA-65 / ML-DSA-87 (FIPS 204), classical RSA-3072 / **RSA-4096**, and ECDSA P-384. |
+| 🔀 **Hybrid** | Sign with a classical **and** a PQC key over one digest — valid while *either* algorithm holds (CNSA 2.0 posture). |
 | 📎 **Detached** | Signs a hash, never the file — huge or classified artifacts stay on your side. |
 | 🔓 **Offline-verifiable** | Every proof checks out with nothing but OpenSSL + the public root. |
 | 🔐 **Hardware-anchored** | Signing keys are generated inside an HSM and never leave it. |
@@ -116,6 +117,9 @@ The signature is a **separate** artifact from the file. You keep your file; the 
 
 **What is "post-quantum"?**
 Signature algorithms (ML-DSA, standardized in FIPS 204) designed to stay secure even against future **quantum computers** — important when a signature must be trusted for 50 years.
+
+**What is "hybrid" signing?**
+Signing the same digest with **both** a classical key (RSA / ECDSA) **and** a post-quantum key (ML-DSA). The result stays valid as long as *either* algorithm remains unbroken — the recommended hedge while PQC is still new.
 
 **Can I verify without trusting the service?**
 Yes. Any envelope verifies **offline** with standard OpenSSL against the published root certificate. The service is convenient, not required.
