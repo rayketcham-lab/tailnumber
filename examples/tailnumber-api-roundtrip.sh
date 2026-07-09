@@ -75,9 +75,10 @@ show "POST $ENDPOINT/sign   (body = just the digest)"
 envelope=$(curl -fsS -H 'content-type: application/json' -d "$req" "$ENDPOINT/sign")
 printf '%s\n' "$envelope" >"$OUT" 2>/dev/null || OUT=""
 sigb64=$(jq -r '.signature' <<<"$envelope"); sigb64=${sigb64#b64:}
+sigsz=$(printf '%s' "$sigb64" | base64 -d 2>/dev/null | wc -c | tr -d ' ')
 look "SIGNING uses the PRIVATE key — it lives in the service / HSM and never leaves."
-look "here is the SIGNATURE it made: ${sigb64:0:40}…"
-look "the reply carries the signer's CERTIFICATE ($(jq '.cert_chain|length' <<<"$envelope") certs: the signer + its issuing CA)."
+look "here is the SIGNATURE it produced — ${B}${sigsz} bytes${Z}${Y}: ${sigb64:0:32}…${sigb64: -12}"
+look "the reply also carries the signer's CERTIFICATE ($(jq '.cert_chain|length' <<<"$envelope") certs — the signer + its issuing CA), so a verifier needs nothing from you but this envelope."
 [[ -n "$OUT" ]] && look "saved the full envelope to ${B}$OUT${Z}${Y} — you can inspect it or paste it into the web dashboard's Verify pane."
 pause
 
@@ -123,15 +124,28 @@ else
 fi
 pause
 
-step "⑥ 🔗  Is the signer trusted? — chain the cert to the root"
+step "⑥ 🔗  Who signed it, and is the signer trusted? — the cert + chain to root"
+subj=$("$OSSL" x509 -in "$WORK/leaf.crt" -noout -subject -nameopt RFC2253 2>/dev/null | sed 's/^subject=//')
+iss=$( "$OSSL" x509 -in "$WORK/leaf.crt" -noout -issuer  -nameopt RFC2253 2>/dev/null | sed 's/^issuer=//')
+ser=$( "$OSSL" x509 -in "$WORK/leaf.crt" -noout -serial  2>/dev/null | sed 's/^serial=//')
+nb=$(  "$OSSL" x509 -in "$WORK/leaf.crt" -noout -startdate 2>/dev/null | sed 's/^notBefore=//')
+na=$(  "$OSSL" x509 -in "$WORK/leaf.crt" -noout -enddate   2>/dev/null | sed 's/^notAfter=//')
+yb=$(date -d "$nb" +%Y 2>/dev/null || true); ya=$(date -d "$na" +%Y 2>/dev/null || true)
+span=""; [[ -n "$yb" && -n "$ya" ]] && span="   (a $((ya-yb))-year certificate — built to outlive the airframe)"
+look "the certificate that produced this signature — WHO vouches for it:"
+printf '      subject : %s%s%s\n' "$B" "${subj:-?}" "$Z"
+printf '      issuer  : %s%s%s\n' "$D" "${iss:-?}" "$Z"
+printf '      serial  : %s%s%s\n' "$D" "${ser:-?}" "$Z"
+printf '      valid   : %s%s  ->  %s%s%s\n' "$D" "$nb" "$na" "$span" "$Z"
 chain_ok=skip
 if curl -fsS "$ENDPOINT/ca/root" 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
     curl -fsS "$ENDPOINT/ca/root" >"$WORK/root.crt"
-    look "this walks signer → issuing CA → root. 'OK' means it chains to the TailNumber root — not just some key someone made up."
+    echo
+    look "now CHAIN it: signer → issuing CA → root. 'OK' means it ties back to the TailNumber root — not just some key someone made up."
     if [[ -s "$WORK/issuing.crt" ]]; then out=$("$OSSL" verify -CAfile "$WORK/root.crt" -untrusted "$WORK/issuing.crt" "$WORK/leaf.crt" 2>&1)
     else out=$("$OSSL" verify -CAfile "$WORK/root.crt" "$WORK/leaf.crt" 2>&1); fi
     printf '    %s\n' "$out"; [[ "$out" == *": OK" ]] && chain_ok=yes || chain_ok=no
-else look "(couldn't reach the CA root — skipping this check)"; fi
+else look "(couldn't reach the CA root — skipping the chain check)"; fi
 pause
 
 step "⑦ 🔬  Byte-for-byte — the exact bytes, and the key"
@@ -184,18 +198,34 @@ printf '      cert actual     spki : %s%s%s\n' "$D" "${cert_spki:-<needs OpenSSL
 pause
 
 step "⑧ ⚖️  Side by side — the service vs. your own OpenSSL"
-ov=$([[ $ossl_valid == true ]] && printf '%s✓ valid%s' "$G" "$Z" || { [[ $ossl_valid == skip ]] && printf '%sskipped%s' "$D" "$Z" || printf '%s✗ FAILED%s' "$R" "$Z"; })
-tv=$([[ $tamper_ok == true ]] && printf '%s✓ rejected%s' "$G" "$Z" || { [[ $tamper_ok == skip ]] && printf '%sskipped%s' "$D" "$Z" || printf '%s✗ passed!%s' "$R" "$Z"; })
-cv=$([[ $chain_ok == yes ]] && printf '%s✓ to root%s' "$G" "$Z" || { [[ $chain_ok == skip ]] && printf '%sskipped%s' "$D" "$Z" || printf '%s✗ fail%s' "$R" "$Z"; })
-RL="------------------------------------"
+# a real side-by-side: the ACTUAL value each side produced, lined up so you can eyeball the match
+sh(){ local h=${1:-}; [[ -n "$h" ]] && printf '%s...%s' "${h:0:10}" "${h: -6}" || printf '(n/a)'; }
+env_alg=$(jq -r '.key.sig_alg' <<<"$envelope")
+dm=$([[ -n "$env_hex" && "$hex" == "$env_hex" ]] && printf '%s✓ identical%s' "$G" "$Z" || printf '%s✗ differ%s' "$R" "$Z")
+km=$([[ -n "$cert_spki" && "$cert_spki" == "$env_spki" ]] && printf '%s✓ same key%s' "$G" "$Z" || printf '%s— n/a%s' "$D" "$Z")
+if   [[ $ossl_valid == true ]]; then vm="${G}✓ agree${Z}";   vtext="Signature Verified"
+elif [[ $ossl_valid == skip ]]; then vm="${D}— skipped${Z}"; vtext="(needs OpenSSL 3.5)"
+else                                 vm="${R}✗ FAILED${Z}";  vtext="Verification FAILURE"; fi
+cm2=$([[ $chain_ok == yes ]] && printf '%s✓ to root%s' "$G" "$Z" || { [[ $chain_ok == skip ]] && printf '%s— skipped%s' "$D" "$Z" || printf '%s✗ fail%s' "$R" "$Z"; })
+tm=$([[ $tamper_ok == true ]] && printf '%s✓ rejected%s' "$G" "$Z" || { [[ $tamper_ok == skip ]] && printf '%s— skipped%s' "$D" "$Z" || printf '%s✗ leaked!%s' "$R" "$Z"; })
+cap(){ printf '   %s%-38.38s%s %s│%s %s%s%s\n' "$D" "$1" "$Z" "$D" "$Z" "$D" "$2" "$Z"; }
+val(){ printf '   %-38.38s %s│%s %s\n' "$1" "$D" "$Z" "$2"; }
+barL=$(printf '─%.0s' {1..38}); barR=$(printf '─%.0s' {1..34})
 echo
-printf '   %s%-36s%s %s│%s %s%s%s\n' "$B$C" "THE SERVICE  (via the API)" "$Z" "$D" "$Z" "$B$C" "YOU  (independent OpenSSL)" "$Z"
-printf '   %-36s %s│%s %s\n' "$RL" "$D" "$Z" "$RL"
-printf '   %-36s %s│%s %s\n' "signs with the PRIVATE key (HSM)"  "$D" "$Z" "verifies with the PUBLIC key"
-printf '   %-36s %s│%s %s\n' "POST /sign   -> envelope"          "$D" "$Z" "envelope carries the sig + cert"
-printf '   %-36s %s│%s pkeyutl -verify -> %s\n' "POST /verify -> valid = $api_valid" "$D" "$Z" "$ov"
-printf '   %-36s %s│%s tampered copy   -> %s\n' "(the service only signs+verifies)"  "$D" "$Z" "$tv"
-printf '   %-36s %s│%s verify -CAfile  -> %s\n' "issued the signer certificate"      "$D" "$Z" "$cv"
+printf '   %s%-38.38s%s %s│%s %s%s%s\n' "$B$C" "THE SERVICE - what its API returned" "$Z" "$D" "$Z" "$B$C" "YOU - what your OpenSSL computed" "$Z"
+printf '   %s%s │ %s%s\n' "$D" "$barL" "$barR" "$Z"
+cap "digest it signed  (from the envelope)" "digest you hashed  (openssl dgst)"
+val "  $(sh "$env_hex")" "  $(sh "$hex")   $dm"
+cap "verdict   POST /verify  ->" "verdict   openssl pkeyutl -verify  ->"
+val "  { \"valid\": $api_valid }" "  $vtext   $vm"
+cap "signer key it names  (spki-256)" "signer key you re-derived  (spki-256)"
+val "  $(sh "$env_spki")" "  $(sh "$cert_spki")   $km"
+cap "algorithm  (envelope.key.sig_alg)" "params you handed OpenSSL"
+val "  $env_alg" "  $PAD   ${G}✓ match${Z}"
+cap "it ISSUED the signer certificate" "you CHAINED signer -> issuing -> root"
+val "  TailNumber issuing CA" "  leaf.crt: OK   $cm2"
+cap "(the service only signs + verifies)" "you flipped ONE byte, re-checked"
+val "  --" "  tampered -> REJECTED   $tm"
 echo
 rule
 if [[ "$ossl_valid" == skip ]]; then
