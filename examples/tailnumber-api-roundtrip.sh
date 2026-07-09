@@ -134,19 +134,30 @@ if curl -fsS "$ENDPOINT/ca/root" 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
 else look "(couldn't reach the CA root — skipping this check)"; fi
 pause
 
-step "⑦ ⚖️  The verdict — service vs. your OpenSSL"
-look "service said valid=$api_valid   ·   your OpenSSL said valid=$ossl_valid"
+step "⑦ ⚖️  Side by side — the service vs. your own OpenSSL"
+ov=$([[ $ossl_valid == true ]] && printf '%s✓ valid%s' "$G" "$Z" || { [[ $ossl_valid == skip ]] && printf '%sskipped%s' "$D" "$Z" || printf '%s✗ FAILED%s' "$R" "$Z"; })
+tv=$([[ $tamper_ok == true ]] && printf '%s✓ rejected%s' "$G" "$Z" || { [[ $tamper_ok == skip ]] && printf '%sskipped%s' "$D" "$Z" || printf '%s✗ passed!%s' "$R" "$Z"; })
+cv=$([[ $chain_ok == yes ]] && printf '%s✓ to root%s' "$G" "$Z" || { [[ $chain_ok == skip ]] && printf '%sskipped%s' "$D" "$Z" || printf '%s✗ fail%s' "$R" "$Z"; })
+RL="------------------------------------"
+echo
+printf '   %s%-36s%s %s│%s %s%s%s\n' "$B$C" "THE SERVICE  (via the API)" "$Z" "$D" "$Z" "$B$C" "YOU  (independent OpenSSL)" "$Z"
+printf '   %-36s %s│%s %s\n' "$RL" "$D" "$Z" "$RL"
+printf '   %-36s %s│%s %s\n' "signs with the PRIVATE key (HSM)"  "$D" "$Z" "verifies with the PUBLIC key"
+printf '   %-36s %s│%s %s\n' "POST /sign   -> envelope"          "$D" "$Z" "envelope carries the sig + cert"
+printf '   %-36s %s│%s pkeyutl -verify -> %s\n' "POST /verify -> valid = $api_valid" "$D" "$Z" "$ov"
+printf '   %-36s %s│%s tampered copy   -> %s\n' "(the service only signs+verifies)"  "$D" "$Z" "$tv"
+printf '   %-36s %s│%s verify -CAfile  -> %s\n' "issued the signer certificate"      "$D" "$Z" "$cv"
+echo
 rule
 if [[ "$ossl_valid" == skip ]]; then
-    printf ' %s✓ Service says valid=%s.%s Independent OpenSSL check skipped (no ML-DSA support here) — re-run with an RSA/ECDSA key to cross-check yourself.\n\n' "$G$B" "$api_valid" "$Z"
+    printf ' %s✓ Service says valid=%s.%s Independent OpenSSL check skipped (needs OpenSSL 3.5 for ML-DSA).\n\n' "$G$B" "$api_valid" "$Z"
 elif [[ "$api_valid" == "$ossl_valid" && "$api_valid" == true ]]; then
-    printf ' %s🏁  All good!%s Your OpenSSL confirmed the signature is valid' "$G$B" "$Z"
+    printf ' %s🏁  MATCH — all good!%s The service said valid, YOUR OpenSSL agreed' "$G$B" "$Z"
     [[ "$tamper_ok" == true ]] && printf ', a tampered copy was REJECTED'
-    [[ "$chain_ok" == yes ]] && printf ',\n    and the cert chains to the TailNumber root'
-    printf ' — the signature is\n    authentic, bound to the exact file, and the file is untampered. 🎉\n'
-    printf ' %s   That is the whole point: you did not have to trust the service — you checked it.%s\n\n' "$D" "$Z"
+    [[ "$chain_ok" == yes ]] && printf ', and the cert chains to the root'
+    printf '.\n %s   You did not have to trust the service — you checked it yourself. 🎉%s\n\n' "$D" "$Z"
 elif [[ "$api_valid" == "$ossl_valid" ]]; then
-    printf ' %s✓ Agreed%s — service and OpenSSL both say NOT valid (as expected for this input).\n\n' "$G" "$Z"
+    printf ' %s✓ MATCH%s — the service and OpenSSL both say NOT valid (as expected for this input).\n\n' "$G" "$Z"
 else
-    printf ' %s⚠  Mismatch:%s the service said valid=%s but YOUR OpenSSL said valid=%s — they disagree, so do NOT trust this envelope.\n\n' "$R$B" "$Z" "$api_valid" "$ossl_valid"; exit 2
+    printf ' %s⚠  MISMATCH:%s service said valid=%s, YOUR OpenSSL said valid=%s — do NOT trust this envelope.\n\n' "$R$B" "$Z" "$api_valid" "$ossl_valid"; exit 2
 fi
