@@ -62,6 +62,7 @@ Small, dependency-light Bash clients that exercise the flow end to end:
 |---|---|
 | [`tailnumber-sign-stepwise.sh`](../examples/tailnumber-sign-stepwise.sh) | Hash a file with **SHA-256**, sign via the API, and print the **envelope to paste into the WebUI → Verify** — step by step. |
 | [`pkcs11-sign-demo.sh`](../examples/pkcs11-sign-demo.sh) | The **HSM signing primitive** with SoftHSM2 + the OpenSSL pkcs11 engine (SHA-256, RSA-3072): a key generated in — and signing inside — the token, then verified. |
+| [`tailnumber-api-roundtrip.sh`](../examples/tailnumber-api-roundtrip.sh) | Sign **and** verify entirely via the API, then **independently re-verify** the envelope with raw OpenSSL and **compare the two verdicts** — proving `/verify` agrees with plain OpenSSL. |
 
 Both print each OpenSSL / API step as they go, so you can follow exactly what
 happens. They need only `bash`, `curl`, and `openssl` (the PKCS#11 demo also uses
