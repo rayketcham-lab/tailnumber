@@ -142,25 +142,44 @@ printf '      the envelope carries : %s%s%s\n' "$D" "$env_hex" "$Z"
 [[ "$hex" == "$env_hex" ]] \
     && printf '      %s✓ byte-for-byte identical%s — the service signed exactly the hash of your file.\n' "$G" "$Z" \
     || printf '      %s✗ they differ!%s\n' "$R" "$Z"
+# the public-key MATERIAL — RSA's "modulus" is just its name for the raw key value;
+# every algorithm has an analog: ECDSA's public point Q, ML-DSA's raw lattice key.
+matfp(){ awk '/pub:|Modulus:/{f=1;next} /^[A-Za-z]/{f=0} f' | tr -dc '0-9a-f' | "$OSSL" md5 2>/dev/null | awk '{print $NF}'; }
+case "$SIG_ALG" in
+    rsa*)    matname="modulus (N)"      ; matwhat="the RSA modulus N" ;;
+    ecdsa*)  matname="public point (Q)" ; matwhat="the public curve point Q" ;;
+    ml-dsa*) matname="raw public key"   ; matwhat="the raw lattice public key" ;;
+    *)       matname="public key"       ; matwhat="the raw public key" ;;
+esac
 if [[ "$SIG_ALG" == rsa* ]]; then
-    cm=$("$OSSL" x509 -in "$WORK/leaf.crt" -noout -modulus 2>/dev/null | "$OSSL" md5 2>/dev/null | awk '{print $NF}')
+    mat=$("$OSSL" x509 -in "$WORK/leaf.crt" -noout -modulus 2>/dev/null | "$OSSL" md5 2>/dev/null | awk '{print $NF}')
+else
+    mat=$("$OSSL" pkey -pubin -in "$WORK/pub.pem" -text_pub -noout 2>/dev/null | matfp)
+fi
+echo
+look "PUBLIC KEY MATERIAL — the raw value of the signer key ($matwhat):"
+printf '      %-18s : %s%s%s\n' "algorithm" "$D" "$SIG_ALG" "$Z"
+printf '      %-18s : %s%s%s  %s(md5)%s\n' "$matname" "$D" "${mat:-<needs OpenSSL 3.5 for this key>}" "$Z" "$D" "$Z"
+printf '      %s↳ RSA calls it the modulus; ECDSA the point Q; ML-DSA the raw key — same idea, different shape.%s\n' "$D" "$Z"
+if [[ "$SIG_ALG" == rsa* ]]; then
     pm=$("$OSSL" rsa -pubin -in "$WORK/pub.pem" -noout -modulus 2>/dev/null | "$OSSL" md5 2>/dev/null | awk '{print $NF}')
     echo
-    look "MODULUS check — the RSA modulus (N) proves the cert and the key are the same pair:"
-    printf '      cert   modulus (md5): %s%s%s\n' "$D" "$cm" "$Z"
+    look "MODULUS cross-check — the classic 'openssl x509 -modulus | md5' cert-vs-key proof:"
+    printf '      cert   modulus (md5): %s%s%s\n' "$D" "$mat" "$Z"
     printf '      pubkey modulus (md5): %s%s%s\n' "$D" "$pm" "$Z"
-    [[ -n "$cm" && "$cm" == "$pm" ]] \
+    [[ -n "$pm" && "$mat" == "$pm" ]] \
         && printf '      %s✓ same modulus%s — the key that verified is the key inside the certificate.\n' "$G" "$Z" \
         || printf '      %s✗ modulus mismatch%s\n' "$R" "$Z"
 fi
+# the algorithm-agnostic version of the modulus check — works for RSA, ECDSA, ML-DSA alike
 cert_spki=$("$OSSL" x509 -in "$WORK/leaf.crt" -pubkey -noout 2>/dev/null | "$OSSL" pkey -pubin -outform DER 2>/dev/null | "$OSSL" dgst -sha256 2>/dev/null | awk '{print $NF}')
 env_spki=$(jq -r '.key.spki_sha256' <<<"$envelope")
 echo
-look "KEY FINGERPRINT — does the cert match the key the envelope names?"
+look "SAME-KEY PROOF (every algorithm) — does the cert match the key the envelope names?"
 printf '      envelope claims spki : %s%s%s\n' "$D" "$env_spki" "$Z"
 printf '      cert actual     spki : %s%s%s\n' "$D" "${cert_spki:-<needs OpenSSL 3.5 for this key>}" "$Z"
 [[ -n "$cert_spki" && "$cert_spki" == "$env_spki" ]] \
-    && printf '      %s✓ match%s — the certificate is exactly the key the envelope claims.\n' "$G" "$Z" \
+    && printf '      %s✓ match%s — SPKI is a SHA-256 over exactly this key material: the modulus check, generalized.\n' "$G" "$Z" \
     || printf '      %s(fingerprint not computed here — skipping)%s\n' "$D" "$Z"
 pause
 
