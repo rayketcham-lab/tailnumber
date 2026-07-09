@@ -197,9 +197,11 @@ printf '      cert actual     spki : %s%s%s\n' "$D" "${cert_spki:-<needs OpenSSL
     || printf '      %s(fingerprint not computed here — skipping)%s\n' "$D" "$Z"
 pause
 
-step "⑧ ⚖️  Side by side — the service vs. your own OpenSSL"
-# a real side-by-side: the ACTUAL value each side produced, lined up so you can eyeball the match
+step "⑧ ⚖️  Side by side — the service vs. your own OpenSSL, value for value"
+# a real side-by-side: the ACTUAL value each side produced, lined up so you can eyeball the match —
+# with the exact command that produced each one underneath, runnable against the files unpacked below.
 sh(){ local h=${1:-}; [[ -n "$h" ]] && printf '%s...%s' "${h:0:10}" "${h: -6}" || printf '(n/a)'; }
+srcname=$(basename "$src")
 env_alg=$(jq -r '.key.sig_alg' <<<"$envelope")
 dm=$([[ -n "$env_hex" && "$hex" == "$env_hex" ]] && printf '%s✓ identical%s' "$G" "$Z" || printf '%s✗ differ%s' "$R" "$Z")
 km=$([[ -n "$cert_spki" && "$cert_spki" == "$env_spki" ]] && printf '%s✓ same key%s' "$G" "$Z" || printf '%s— n/a%s' "$D" "$Z")
@@ -210,22 +212,40 @@ cm2=$([[ $chain_ok == yes ]] && printf '%s✓ to root%s' "$G" "$Z" || { [[ $chai
 tm=$([[ $tamper_ok == true ]] && printf '%s✓ rejected%s' "$G" "$Z" || { [[ $tamper_ok == skip ]] && printf '%s— skipped%s' "$D" "$Z" || printf '%s✗ leaked!%s' "$R" "$Z"; })
 cap(){ printf '   %s%-38.38s%s %s│%s %s%s%s\n' "$D" "$1" "$Z" "$D" "$Z" "$D" "$2" "$Z"; }
 val(){ printf '   %-38.38s %s│%s %s\n' "$1" "$D" "$Z" "$2"; }
+cmd(){ printf '       %s└─ $ %s%s\n' "$D" "$1" "$Z"; }
 barL=$(printf '─%.0s' {1..38}); barR=$(printf '─%.0s' {1..34})
+chaincmd="openssl verify -CAfile root.crt leaf.crt"; [[ -s "$WORK/issuing.crt" ]] && chaincmd="openssl verify -CAfile root.crt -untrusted issuing.crt leaf.crt"
+# unpack the envelope's parts next to the saved envelope, so every command below actually runs
+if [[ -n "$OUT" ]] && PARTS="$(cd "$(dirname "$OUT")" && pwd)/tailnumber-parts" && mkdir -p "$PARTS" 2>/dev/null; then
+    cp -f "$src" "$PARTS/$srcname" 2>/dev/null || true
+    for f in digest.bin sig.bin pub.pem leaf.crt issuing.crt root.crt; do [[ -s "$WORK/$f" ]] && cp -f "$WORK/$f" "$PARTS/$f" 2>/dev/null || true; done
+    [[ -s "$WORK/tdigest.bin" ]] && cp -f "$WORK/tdigest.bin" "$PARTS/tampered-digest.bin" 2>/dev/null || true
+else PARTS=""; fi
 echo
 printf '   %s%-38.38s%s %s│%s %s%s%s\n' "$B$C" "THE SERVICE - what its API returned" "$Z" "$D" "$Z" "$B$C" "YOU - what your OpenSSL computed" "$Z"
 printf '   %s%s │ %s%s\n' "$D" "$barL" "$barR" "$Z"
 cap "digest it signed  (from the envelope)" "digest you hashed  (openssl dgst)"
 val "  $(sh "$env_hex")" "  $(sh "$hex")   $dm"
+cmd "openssl dgst -$DALG $srcname"
 cap "verdict   POST /verify  ->" "verdict   openssl pkeyutl -verify  ->"
 val "  { \"valid\": $api_valid }" "  $vtext   $vm"
+cmd "openssl pkeyutl -verify -pubin -inkey pub.pem -in digest.bin -sigfile sig.bin $VARGS"
 cap "signer key it names  (spki-256)" "signer key you re-derived  (spki-256)"
 val "  $(sh "$env_spki")" "  $(sh "$cert_spki")   $km"
+cmd "openssl x509 -in leaf.crt -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256"
 cap "algorithm  (envelope.key.sig_alg)" "params you handed OpenSSL"
 val "  $env_alg" "  $PAD   ${G}✓ match${Z}"
+cmd "openssl x509 -in leaf.crt -noout -text        # shows the key + signature algorithm"
 cap "it ISSUED the signer certificate" "you CHAINED signer -> issuing -> root"
 val "  TailNumber issuing CA" "  leaf.crt: OK   $cm2"
+cmd "$chaincmd"
 cap "(the service only signs + verifies)" "you flipped ONE byte, re-checked"
 val "  --" "  tampered -> REJECTED   $tm"
+cmd "openssl pkeyutl -verify -pubin -inkey pub.pem -in tampered-digest.bin -sigfile sig.bin $VARGS"
+if [[ -n "$PARTS" ]]; then
+    echo; look "every command above is RUNNABLE — its inputs are unpacked here:"
+    printf '        %s%s%s   %s(cd there and try any line)%s\n' "$B" "$PARTS" "$Z" "$D" "$Z"
+fi
 echo
 rule
 if [[ "$ossl_valid" == skip ]]; then
