@@ -33,7 +33,7 @@ The frozen wire format (the `envelope.py` module — implementation is private):
 |---|---|---|
 | `version` | int | Envelope schema version (`1`). |
 | `signed_at` | RFC 3339 UTC | Service-asserted signing instant (`…Z`). |
-| `service` | string | Producing service + version, e.g. `tailnumber/1.0.0`. |
+| `service` | string | Producing service + version, e.g. `tailnumber/1.1.0`. |
 | `key.label` | string | Signing key identifier within the service/HSM. |
 | `key.sig_alg` | enum | Signature algorithm (see §6). |
 | `key.spki_sha256` | b64 | SHA-256 of the SubjectPublicKeyInfo — a key fingerprint independent of the certificate. |
@@ -86,7 +86,7 @@ binds the digest to the artifact (and may record that binding in `artifact`).
 
 | Format | Serialization | Encoding | Signed bytes | Detached | Multi-sig | Long-term profile | Spec |
 |---|---|---|---|---|---|---|---|
-| **TailNumber `.sig.json`** | JSON | base64 | client digest | **yes** (native) | no (today) | via profile (§7) | this repo |
+| **TailNumber `.sig.json`** | JSON | base64 | client digest | **yes** (native) | **yes** (hybrid) | via profile (§7) | this repo |
 | **JWS Compact / JWT** | JSON→compact | base64url | `hdr.payload` | App. F | no | — | RFC 7515 / 7519 |
 | **JWS JSON Serialization** | JSON | base64url | `hdr.payload` | App. F + RFC 7797 | **yes** | — | RFC 7515 |
 | **JAdES** | JSON (JWS) | base64url | JWS + attrs | yes | yes | **B-LTA** | ETSI TS 119 182-1 |
@@ -130,6 +130,8 @@ cryptography — same key, same certificate chain, same signature primitive.
 |---|---|---|---|---|---|
 | `rsa3072-pkcs1-sha256` | `RS256` | `-257` | `sha256WithRSAEncryption` | `-pkeyopt digest:sha256` | RFC 7518 |
 | `rsa3072-pss-sha256` | `PS256` | `-37` | `id-RSASSA-PSS` | `-pkeyopt digest:sha256 -pkeyopt rsa_padding_mode:pss -pkeyopt rsa_pss_saltlen:digest` | RFC 7518 |
+| `rsa4096-pkcs1-sha384` | `RS384` | `-258` | `sha384WithRSAEncryption` | `-pkeyopt digest:sha384` | RFC 7518 |
+| `rsa4096-pss-sha384` | `PS384` | `-38` | `id-RSASSA-PSS` | `-pkeyopt digest:sha384 -pkeyopt rsa_padding_mode:pss -pkeyopt rsa_pss_saltlen:digest` | RFC 7518 |
 | `ecdsa-p384-sha384` | `ES384` | `-35` | `ecdsa-with-SHA384` | *(none — raw 48-byte digest)* | RFC 7518 |
 | `ml-dsa-65` | **†** | **‡** | `id-ml-dsa-65` (2.16.840.1.101.3.4.3.18) | `-rawin` *(OpenSSL 3.5+)* | FIPS 204 |
 | `ml-dsa-87` | **†** | **‡** | `id-ml-dsa-87` (2.16.840.1.101.3.4.3.19) | `-rawin` *(OpenSSL 3.5+)* | FIPS 204 |
