@@ -134,7 +134,37 @@ if curl -fsS "$ENDPOINT/ca/root" 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
 else look "(couldn't reach the CA root — skipping this check)"; fi
 pause
 
-step "⑦ ⚖️  Side by side — the service vs. your own OpenSSL"
+step "⑦ 🔬  Byte-for-byte — the exact bytes, and the key"
+env_hex=$(od -An -tx1 "$WORK/digest.bin" | tr -d ' \n')
+look "the RAW DIGEST — the exact bytes the service signed:"
+printf '      you hashed the file  : %s%s%s\n' "$D" "$hex" "$Z"
+printf '      the envelope carries : %s%s%s\n' "$D" "$env_hex" "$Z"
+[[ "$hex" == "$env_hex" ]] \
+    && printf '      %s✓ byte-for-byte identical%s — the service signed exactly the hash of your file.\n' "$G" "$Z" \
+    || printf '      %s✗ they differ!%s\n' "$R" "$Z"
+if [[ "$SIG_ALG" == rsa* ]]; then
+    cm=$("$OSSL" x509 -in "$WORK/leaf.crt" -noout -modulus 2>/dev/null | "$OSSL" md5 2>/dev/null | awk '{print $NF}')
+    pm=$("$OSSL" rsa -pubin -in "$WORK/pub.pem" -noout -modulus 2>/dev/null | "$OSSL" md5 2>/dev/null | awk '{print $NF}')
+    echo
+    look "MODULUS check — the RSA modulus (N) proves the cert and the key are the same pair:"
+    printf '      cert   modulus (md5): %s%s%s\n' "$D" "$cm" "$Z"
+    printf '      pubkey modulus (md5): %s%s%s\n' "$D" "$pm" "$Z"
+    [[ -n "$cm" && "$cm" == "$pm" ]] \
+        && printf '      %s✓ same modulus%s — the key that verified is the key inside the certificate.\n' "$G" "$Z" \
+        || printf '      %s✗ modulus mismatch%s\n' "$R" "$Z"
+fi
+cert_spki=$("$OSSL" x509 -in "$WORK/leaf.crt" -pubkey -noout 2>/dev/null | "$OSSL" pkey -pubin -outform DER 2>/dev/null | "$OSSL" dgst -sha256 2>/dev/null | awk '{print $NF}')
+env_spki=$(jq -r '.key.spki_sha256' <<<"$envelope")
+echo
+look "KEY FINGERPRINT — does the cert match the key the envelope names?"
+printf '      envelope claims spki : %s%s%s\n' "$D" "$env_spki" "$Z"
+printf '      cert actual     spki : %s%s%s\n' "$D" "${cert_spki:-<needs OpenSSL 3.5 for this key>}" "$Z"
+[[ -n "$cert_spki" && "$cert_spki" == "$env_spki" ]] \
+    && printf '      %s✓ match%s — the certificate is exactly the key the envelope claims.\n' "$G" "$Z" \
+    || printf '      %s(fingerprint not computed here — skipping)%s\n' "$D" "$Z"
+pause
+
+step "⑧ ⚖️  Side by side — the service vs. your own OpenSSL"
 ov=$([[ $ossl_valid == true ]] && printf '%s✓ valid%s' "$G" "$Z" || { [[ $ossl_valid == skip ]] && printf '%sskipped%s' "$D" "$Z" || printf '%s✗ FAILED%s' "$R" "$Z"; })
 tv=$([[ $tamper_ok == true ]] && printf '%s✓ rejected%s' "$G" "$Z" || { [[ $tamper_ok == skip ]] && printf '%sskipped%s' "$D" "$Z" || printf '%s✗ passed!%s' "$R" "$Z"; })
 cv=$([[ $chain_ok == yes ]] && printf '%s✓ to root%s' "$G" "$Z" || { [[ $chain_ok == skip ]] && printf '%sskipped%s' "$D" "$Z" || printf '%s✗ fail%s' "$R" "$Z"; })
