@@ -10,46 +10,56 @@
 &nbsp;![OpenSSL](https://img.shields.io/badge/OpenSSL-3.5-66cc00.svg)
 &nbsp;[![Live demo](https://img.shields.io/badge/demo-live-2ea44f.svg)](https://www.rayketcham.com/CRLs/tailnumber/db/)
 
-**Public overview of a private, access-controlled project.**
+*Prove a file is authentic and untampered — with signatures built to outlive the aircraft and resist quantum computers.*
 
 </div>
 
-> ### ⚠️ Proprietary — source available on request
-> This repository is the **public overview**; the implementation is maintained privately and is **not published**. No license or right is granted to use, copy, deploy, or create derivative works — see [`LICENSE`](LICENSE). The **live demo** below is open for evaluation. © 2026 rayketcham-lab.
+> **⚠️ Proprietary — source available on request.** This is the public overview; the implementation is private. No rights are granted to use, copy, or deploy — see [`LICENSE`](LICENSE). The **live demo** is open for evaluation. © 2026 rayketcham-lab.
 
 ---
 
-## Overview
+## TL;DR
 
-TailNumber is a **detached hash-signing service** for the SPEC42 Aerospace program. A client presents a **file, text, or a precomputed digest**; the service signs the digest with a key generated inside — and never leaving — a hardware security module, and returns a self-describing **signature envelope** (`.sig.json`: signature, X.509 certificate chain, digest, and provenance metadata). Because only the digest is signed under the `digest-as-message` profile, the artifact never leaves the client — arbitrarily large or classified payloads are in scope — and every envelope is **verifiable offline** against the pinned trust root with nothing but OpenSSL.
+- **What it is** — a service that **digitally signs** software artifacts (firmware, packages, documents) and lets anyone **verify** them later.
+- **How it works** — you send a **hash** of your file (not the file itself); the service signs that hash with a hardware-protected key and returns a small, portable **proof** you can verify anywhere — even offline.
+- **What makes it different** — **post-quantum** signatures (FIPS 204), a trust chain valid for **50 years**, and private keys that **never leave the hardware**.
+- **See it now** — [**live dashboard**](https://www.rayketcham.com/CRLs/tailnumber/db/) · [API docs](https://www.rayketcham.com/CRLs/tailnumber/docs)
 
-The service is **post-quantum first**: primary algorithms are **ML-DSA-65 / ML-DSA-87** (FIPS 204), with classical **RSA-3072** (RSASSA-PSS and PKCS#1 v1.5) and **ECDSA P-384** for hybrid and legacy-interoperable deployments. Authenticity is anchored in a three-tier X.509 hierarchy sized to the platform lifetime (Root 55y · Issuing 54y · Signer 50y).
+---
+
+## The problem
+
+Aerospace software has to be **trusted for the life of the airframe** — 30, 40, 50 years. Two things break normal code-signing over that horizon:
+
+1. **Certificates expire.** Off-the-shelf signing certs last 1–3 years; the platform lasts decades.
+2. **Quantum computers are coming.** Today's RSA/ECDSA signatures may be forgeable by future quantum machines — a real risk for anything that must stay trustworthy for 50 years.
+
+TailNumber is built for exactly this: **long-lived, post-quantum, hardware-anchored** signing.
+
+## How it works
+
+Three steps — and your file never leaves your machine:
+
+1. **Hash** — you compute a digest (fingerprint) of your artifact locally.
+2. **Sign** — you send only the digest; a key held inside a hardware security module (HSM) signs it.
+3. **Verify** — you get back a portable **envelope** (`.sig.json`) that anyone can check against the public trust root — through the service *or* offline with just OpenSSL.
 
 ```mermaid
 flowchart LR
-  subgraph IN["① Input — any one"]
+  subgraph IN["① Your machine"]
     direction TB
-    F["File"]
-    T["Text"]
-    H["Hex / base64 digest"]
+    F["File / firmware"]
+    H["Hash (digest)"]
+    F -->|"stays local"| H
   end
-  IN -->|"SHA-2 digest"| API["② API · Dashboard"]
-  API --> SIGN["③ Sign<br/>digest-as-message"]
-  subgraph ALG["Algorithm"]
-    direction TB
-    ML["ML-DSA-65 / 87 · PQC"]
-    RA["RSA-3072 · PSS / PKCS#1"]
-    EC["ECDSA · P-384"]
-  end
-  SIGN --> ALG
-  ALG --> HSM["④ Luna T3000 HSM<br/>PKCS#11 · keys never leave hardware"]
-  subgraph CA["Trust anchor · CA keys in HSM"]
-    direction TB
+  H -->|"send only the hash"| API["② TailNumber"]
+  API --> HSM["③ Sign in the HSM<br/>key never leaves hardware"]
+  HSM --> ENV["④ Envelope (.sig.json)<br/>signature · certificate · digest"]
+  ENV --> VER["⑤ Verify<br/>service — or offline with OpenSSL"]
+  subgraph CA["Trust anchor"]
     R["Root CA · 55y"] --> IS["Issuing CA · 54y"] --> LC["Signer · 50y"]
   end
   CA -. certifies .-> HSM
-  HSM --> ENV["⑤ Envelope · .sig.json<br/>signature · X.509 chain · digest"]
-  ENV --> VER["⑥ Verify<br/>service · or offline (OpenSSL only)"]
   VER -. chains to .-> CA
   classDef anchor stroke:#d29922,stroke-width:2px;
   classDef hw stroke:#8957e5,stroke-width:2px;
@@ -57,45 +67,74 @@ flowchart LR
   class HSM hw;
 ```
 
-**The envelope is a serialization, not a lock-in.** The same HSM-backed, CA-chained signature bytes can be re-emitted as a detached **JWS** (`PS256` / `RS256` / `ES384`), a **`COSE_Sign1`**, or a **CMS `.p7s`** — the wrapper changes, the trust root does not. Full spec + a mapping against **JWT / JWS · JAdES · COSE · CMS · CAdES · DSSE** in **[docs/INTEROP.md](docs/INTEROP.md)**.
+## Try it live
 
-## ▶ Try it live
-
-The service is running — evaluate it without the source:
+The service is running — evaluate it without any source:
 
 | | |
 |---|---|
-| **Dashboard** — hash, sign & verify in one pane | https://www.rayketcham.com/CRLs/tailnumber/db/ |
-| **API docs** (Swagger) | https://www.rayketcham.com/CRLs/tailnumber/docs |
-| **OpenAPI spec** | https://www.rayketcham.com/CRLs/tailnumber/openapi.json |
+| **Dashboard** — hash, sign & verify in one page | https://www.rayketcham.com/CRLs/tailnumber/db/ |
+| **API docs** (interactive) | https://www.rayketcham.com/CRLs/tailnumber/docs |
+| **Usage metrics** (JSON) | https://www.rayketcham.com/CRLs/tailnumber/api/v1/metrics |
 
 New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkthrough.
 
-## Capabilities
+## Features
 
 | | |
 |---|---|
-| **Post-quantum** | ML-DSA-65 / ML-DSA-87 (FIPS 204), plus RSA-3072 (PSS / PKCS#1 v1.5) and ECDSA P-384. |
-| **Detached** | Signs a digest, never the artifact — large or classified payloads stay put. |
-| **Offline-verifiable** | Every envelope verifies with nothing but OpenSSL + the published root. |
-| **HSM-anchored** | Signing **and CA** keys are generated inside a Thales Luna T3000 HSM (FIPS 140-2 L3) and never leave it. |
-| **Tamper-evident** | Every operation is written to a hash-chained, re-verified audit log. |
-| **Interoperable** | Re-serializable as JWS / COSE / CMS without changing the trust root. |
+| 🔮 **Post-quantum** | ML-DSA-65 / ML-DSA-87 (FIPS 204), plus classical RSA-3072 and ECDSA P-384. |
+| 📎 **Detached** | Signs a hash, never the file — huge or classified artifacts stay on your side. |
+| 🔓 **Offline-verifiable** | Every proof checks out with nothing but OpenSSL + the public root. |
+| 🔐 **Hardware-anchored** | Signing keys are generated inside an HSM and never leave it. |
+| 📜 **Tamper-evident** | Every operation is written to a hash-chained audit log, re-verified on read. |
+| 🔗 **Interoperable** | The same signature re-serializes as JWS, COSE, or CMS — no lock-in. |
 
 ## Built to outlive the airframe
 
-Aerospace artifacts must stay verifiable for the **life of the platform** — decades, not the 1-3 years of a typical code-signing certificate. The trust chain is sized so each tier outlives the one below:
+Each tier of the trust chain outlives the one below, so a signature stays verifiable for the life of the platform:
 
-| Certificate | Validity |
+| Certificate | Valid for |
 |---|---|
 | **Root CA** | **55 years** |
 | **Issuing CA** | **54 years** |
-| **Signer** | **50 years** (to the day) |
+| **Signer** | **50 years** |
 
-**A hard constraint — not a blocker.** 50-year validity crosses the RFC 5280 `UTCTime → GeneralizedTime` (year-2049) boundary that trips naive tooling; the pinned OpenSSL 3.5 and the offline verifier handle post-2049 `GeneralizedTime` cleanly, so the chain validates **today and decades out**.
+50-year validity crosses a certificate-format boundary (the RFC 5280 year-2049 line) that trips a lot of tooling — TailNumber handles it, so proofs still verify decades out.
+
+## Standards & interoperability
+
+TailNumber's envelope is deliberately minimal, but the signature inside is standards-grade: the same HSM-backed, certificate-chained signature can be re-emitted as a detached **JWS**, a **COSE** object, or a **CMS/PKCS#7** `.p7s` — the wrapper changes, the trust root doesn't. Full spec + a mapping against JWT / JWS · JAdES · COSE · CMS · DSSE is in **[docs/INTEROP.md](docs/INTEROP.md)**.
+
+## FAQ
+
+**Is my file uploaded to the service?**
+No. Only its **hash** is sent. The file itself never leaves your machine — which is why huge or sensitive artifacts are fine.
+
+**What does "detached" mean?**
+The signature is a **separate** artifact from the file. You keep your file; the service stores nothing about it beyond the hash you chose to sign.
+
+**What is "post-quantum"?**
+Signature algorithms (ML-DSA, standardized in FIPS 204) designed to stay secure even against future **quantum computers** — important when a signature must be trusted for 50 years.
+
+**Can I verify without trusting the service?**
+Yes. Any envelope verifies **offline** with standard OpenSSL against the published root certificate. The service is convenient, not required.
+
+**Why 50-year certificates?**
+Because an aircraft's software must stay verifiable for the life of the aircraft. A signature has to **outlive what it signs**.
+
+**Is the source code available?**
+The implementation is **private**. The live demo is open for evaluation, and source access / licensing is available **on request**.
+
+## Project status
+
+- ✅ **Live** — the demo above is running and open for evaluation.
+- ✅ **Signing CA deployed** — real trust chain, offline verification working.
+- 🔐 **HSM** — the production design targets a **Thales Luna T3000** (FIPS 140-2 Level 3); validated ahead of hardware against SoftHSM2.
+- 🧪 **Maturity** — proof of concept under active development; not yet a production release.
 
 ## Source & licensing
 
-The service, CA tooling, HSM backend, and deployment are maintained in a **private, access-controlled repository** — this page is the public overview, and the **live demo** above is open for evaluation. For source access or licensing enquiries, contact the maintainers.
+The service, CA tooling, HSM backend, and deployment live in a **private, access-controlled repository**. This page is the public overview; the live demo is open. For source access or licensing, **contact the maintainers**.
 
 **Proprietary — © 2026 rayketcham-lab. All rights reserved.**
