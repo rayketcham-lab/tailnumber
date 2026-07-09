@@ -1,0 +1,5 @@
+# Created by: Ray Ketcham
+# Date 2026-07-08
+# Purpose: POC testing detached hash based signing
+
+This is a test for HSaaS - Hash Signing as a Service!

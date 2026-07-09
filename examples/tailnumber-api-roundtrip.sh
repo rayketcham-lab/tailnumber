@@ -48,7 +48,9 @@ esac
 OSSL_CAN=yes
 [[ "$SIG_ALG" == ml-dsa* ]] && ! "$OSSL" list -signature-algorithms 2>/dev/null | grep -qiE 'ml-?dsa' && OSSL_CAN=no
 
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 src=${1:-}; note=""
+if [[ -z "$src" && -f "$HERE/test-hash-based-signing.txt" ]]; then src="$HERE/test-hash-based-signing.txt"; note="  ${D}(the sample file in this folder)${Z}"; fi
 if [[ -z "$src" ]]; then src=$(mktemp); echo "hello from tailnumber @ $(date -u +%FT%TZ)" >"$src"; note="  ${D}(a demo message — pass a FILE to sign your own)${Z}"; fi
 WORK=${TN_WORK:-$(mktemp -d)}; mkdir -p "$WORK"; trap 'rm -rf "$WORK"' EXIT
 OUT=${TN_OUT:-./tailnumber-envelope.sig.json}
@@ -105,7 +107,23 @@ else
 fi
 pause
 
-step "⑤ 🔗  Is the signer trusted? — chain the cert to the root"
+step "⑤ 🧪  Tamper check — change the file, confirm it gets REJECTED"
+if [[ "$OSSL_CAN" == no ]]; then
+    tamper_ok=skip; look "(skipped — the OpenSSL verify above did not run)"
+else
+    cp "$src" "$WORK/tampered"; printf 'X' >>"$WORK/tampered"           # append ONE byte to a copy
+    "$OSSL" dgst -"$DALG" -binary "$WORK/tampered" >"$WORK/tdigest.bin"
+    look "we appended ONE byte to a copy of your file and re-hashed it — same signature, changed content."
+    show "openssl pkeyutl -verify -pubin -inkey pub.pem -in tampered-digest.bin -sigfile sig.bin $VARGS"
+    # shellcheck disable=SC2086
+    if "$OSSL" pkeyutl -verify -pubin -inkey "$WORK/pub.pem" -in "$WORK/tdigest.bin" -sigfile "$WORK/sig.bin" $VARGS >/dev/null 2>&1
+    then tamper_ok=false; printf '    %s✗ Uh oh — the tampered copy still verified (it should NOT)%s\n' "$R" "$Z"
+    else tamper_ok=true;  printf '    %s✓ Rejected: Signature Verification Failure — exactly right!%s\n' "$G" "$Z"; fi
+    look "THIS is what makes 'valid' mean something: the signature is bound to the exact bytes. Change anything → it fails."
+fi
+pause
+
+step "⑥ 🔗  Is the signer trusted? — chain the cert to the root"
 chain_ok=skip
 if curl -fsS "$ENDPOINT/ca/root" 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
     curl -fsS "$ENDPOINT/ca/root" >"$WORK/root.crt"
@@ -116,15 +134,16 @@ if curl -fsS "$ENDPOINT/ca/root" 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
 else look "(couldn't reach the CA root — skipping this check)"; fi
 pause
 
-step "⑥ ⚖️  The verdict — service vs. your OpenSSL"
+step "⑦ ⚖️  The verdict — service vs. your OpenSSL"
 look "service said valid=$api_valid   ·   your OpenSSL said valid=$ossl_valid"
 rule
 if [[ "$ossl_valid" == skip ]]; then
     printf ' %s✓ Service says valid=%s.%s Independent OpenSSL check skipped (no ML-DSA support here) — re-run with an RSA/ECDSA key to cross-check yourself.\n\n' "$G$B" "$api_valid" "$Z"
 elif [[ "$api_valid" == "$ossl_valid" && "$api_valid" == true ]]; then
-    printf ' %s🏁  All good!%s The service said valid, YOUR OpenSSL agreed' "$G$B" "$Z"
-    [[ "$chain_ok" == yes ]] && printf ',\n    and the certificate chains to the TailNumber root'
-    printf ' — the signature\n    is authentic and the file is untampered. 🎉\n'
+    printf ' %s🏁  All good!%s Your OpenSSL confirmed the signature is valid' "$G$B" "$Z"
+    [[ "$tamper_ok" == true ]] && printf ', a tampered copy was REJECTED'
+    [[ "$chain_ok" == yes ]] && printf ',\n    and the cert chains to the TailNumber root'
+    printf ' — the signature is\n    authentic, bound to the exact file, and the file is untampered. 🎉\n'
     printf ' %s   That is the whole point: you did not have to trust the service — you checked it.%s\n\n' "$D" "$Z"
 elif [[ "$api_valid" == "$ossl_valid" ]]; then
     printf ' %s✓ Agreed%s — service and OpenSSL both say NOT valid (as expected for this input).\n\n' "$G" "$Z"
