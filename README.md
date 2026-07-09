@@ -109,6 +109,10 @@ Each tier of the trust chain outlives the one below, so a signature stays verifi
 
 TailNumber's envelope is deliberately minimal, but the signature inside is standards-grade: the same HSM-backed, certificate-chained signature can be re-emitted as a detached **JWS**, a **COSE** object, or a **CMS/PKCS#7** `.p7s` — the wrapper changes, the trust root doesn't. Full spec + a mapping against JWT / JWS · JAdES · COSE · CMS · DSSE is in **[docs/INTEROP.md](docs/INTEROP.md)**.
 
+## Tech stack & build
+
+Built for a **minimal, auditable surface**: **Python 3.12** + **FastAPI / uvicorn**, one **pinned OpenSSL 3.5.4** for *all* cryptography (including post-quantum ML-DSA), and **PKCS#11** for keys — **SoftHSM2** in dev, a **Thales Luna T3000** in production. Three direct Python dependencies, and no Python crypto library. The full stack, dependencies, server requirements, and runnable client scripts are in **[docs/STACK.md](docs/STACK.md)** — including two step-by-step examples: an API signer that prints an envelope to paste into the WebUI, and a SoftHSM/PKCS#11 in-token signing demo.
+
 ## FAQ
 
 **Is my file uploaded to the service?**
