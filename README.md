@@ -79,6 +79,8 @@ The service is running — evaluate it without any source:
 
 New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkthrough.
 
+**Want to test it yourself?** Follow **[docs/TESTING.md](docs/TESTING.md)** — sign a file, verify the signature, confirm the **file matches its envelope**, and prove **tamper-detection**, all copy-paste. In the dashboard, *Verify an envelope* now takes the **original file** and reports **✓ AUTHENTIC** (the file is hashed in your browser, never uploaded).
+
 ## Features
 
 | | |
