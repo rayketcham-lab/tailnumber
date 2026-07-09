@@ -85,6 +85,8 @@ New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkt
 |---|---|
 | 🔮 **Post-quantum** | ML-DSA-65 / ML-DSA-87 (FIPS 204), classical RSA-3072 / **RSA-4096**, and ECDSA P-384. |
 | 🔀 **Hybrid** | Sign with a classical **and** a PQC key over one digest — valid while *either* algorithm holds (CNSA 2.0 posture). |
+| 🎛️ **Composable** | Don't settle for a pre-baked algorithm — compose it: RSA **padding** (PSS / PKCS#1 v1.5), **digest**, and **PSS salt**. |
+| 🗝️ **Governed keys** | Keys are minted **on-box only** (never via the API), capturing provenance: creator, reason, PMA/TSO approval, DO-178C level. |
 | 📎 **Detached** | Signs a hash, never the file — huge or classified artifacts stay on your side. |
 | 🔓 **Offline-verifiable** | Every proof checks out with nothing but OpenSSL + the public root. |
 | 🔐 **Hardware-anchored** | Signing keys are generated inside an HSM and never leave it. |
@@ -120,6 +122,12 @@ Signature algorithms (ML-DSA, standardized in FIPS 204) designed to stay secure 
 
 **What is "hybrid" signing?**
 Signing the same digest with **both** a classical key (RSA / ECDSA) **and** a post-quantum key (ML-DSA). The result stays valid as long as *either* algorithm remains unbroken — the recommended hedge while PQC is still new.
+
+**Can I customize the signature algorithm?**
+Yes. Instead of a fixed named algorithm you **compose** the parameters that matter: RSA **padding** (PSS or PKCS#1 v1.5), **digest** (SHA-256 / 384 / 512), and **PSS salt length**. ECDSA exposes the digest; ML-DSA is parameter-free by design. Every custom combination still verifies through the service or offline with OpenSSL — and the dashboard shows a live *signing profile* plus the exact OpenSSL "show your work" evidence.
+
+**How are keys created?**
+On-box only, via a local CLI — **never over the API**. Creation touches the CA private key, so it's a privileged admin operation, and it records governance provenance (creator, reason, approver, PMA/TSO approval, DO-178C level) that travels with the key.
 
 **Can I verify without trusting the service?**
 Yes. Any envelope verifies **offline** with standard OpenSSL against the published root certificate. The service is convenient, not required.
