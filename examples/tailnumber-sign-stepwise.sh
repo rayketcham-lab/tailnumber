@@ -24,7 +24,11 @@ hex=$("$OSSL" dgst -sha256 "$src" | awk '{print $NF}')
 printf '     sha256(%s)\n       = %s\n' "$src" "$hex"
 
 step "2/4  Send only the digest to the service"
-req=$(printf '{"key_label":"%s","sig_alg":"%s","digest_alg":"sha256","digest":"sha256=%s"}' "$KEY" "$SIG_ALG" "$hex")
+if command -v jq >/dev/null; then   # build JSON safely (no injection via KEY/SIG_ALG) when jq is present
+    req=$(jq -nc --arg k "$KEY" --arg a "$SIG_ALG" --arg d "sha256=$hex" '{key_label:$k,sig_alg:$a,digest_alg:"sha256",digest:$d}')
+else
+    req=$(printf '{"key_label":"%s","sig_alg":"%s","digest_alg":"sha256","digest":"sha256=%s"}' "$KEY" "$SIG_ALG" "$hex")
+fi
 printf '     POST %s/sign\n     %s\n' "$ENDPOINT" "$req"
 
 step "3/4  The service signs with its key (which never leaves the service / HSM)"
