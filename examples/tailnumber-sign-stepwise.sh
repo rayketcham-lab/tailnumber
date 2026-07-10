@@ -6,7 +6,7 @@
 set -euo pipefail
 
 ENDPOINT=${TN_ENDPOINT:-https://www.rayketcham.com/CRLs/tailnumber/api/v1}
-KEY=${TN_KEY_LABEL:-tailnumber-legacy-rsa-01}        # an RSA key => SHA-256
+KEY=${TN_KEY_LABEL:-tailnumber-codesign-01}        # an RSA key => SHA-256
 SIG_ALG=${TN_SIG_ALG:-rsa3072-pss-sha256}
 OSSL=${OSSL:-openssl}                                # any OpenSSL is fine for SHA-256
 

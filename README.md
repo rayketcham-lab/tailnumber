@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 &nbsp;![PQC](https://img.shields.io/badge/PQC-ML--DSA%20·%20FIPS%20204-8957e5.svg)
-&nbsp;![HSM](https://img.shields.io/badge/keys-Luna%20T3000%20HSM-1f6feb.svg)
+&nbsp;![HSM](https://img.shields.io/badge/keys-SoftHSM2%20%E2%86%92%20Luna%20T--Series-1f6feb.svg)
 &nbsp;![OpenSSL](https://img.shields.io/badge/OpenSSL-3.5-66cc00.svg)
 &nbsp;[![Live demo](https://img.shields.io/badge/demo-live-2ea44f.svg)](https://www.rayketcham.com/CRLs/tailnumber/db/)
 
@@ -115,7 +115,7 @@ TailNumber's envelope is deliberately minimal, but the signature inside is stand
 
 ## Tech stack & build
 
-Built for a **minimal, auditable surface**: **Python 3.12** + **FastAPI / uvicorn**, one **pinned OpenSSL 3.5.4** for *all* cryptography (including post-quantum ML-DSA), and **PKCS#11** for keys — **SoftHSM2** in dev, a **Thales Luna T3000** in production. Three direct Python dependencies, and no Python crypto library. The full stack, dependencies, server requirements, and runnable client scripts are in **[docs/STACK.md](docs/STACK.md)** — including two step-by-step examples: an API signer that prints an envelope to paste into the WebUI, and a SoftHSM/PKCS#11 in-token signing demo.
+Built for a **minimal, auditable surface**: **Python 3.12** + **FastAPI / uvicorn**, one **pinned OpenSSL 3.5.4** for *all* cryptography (including post-quantum ML-DSA), and **PKCS#11** for keys — **SoftHSM2** today, a **Thales TCT Luna T-Series (T3000)** in production. Three direct Python dependencies, and no Python crypto library. The full stack, dependencies, server requirements, and runnable client scripts are in **[docs/STACK.md](docs/STACK.md)** — including two step-by-step examples: an API signer that prints an envelope to paste into the WebUI, and a SoftHSM/PKCS#11 in-token signing demo.
 
 ## FAQ
 
@@ -150,8 +150,8 @@ The implementation is **private**. The live demo is open for evaluation, and sou
 
 - ✅ **Live** — the demo above is running and open for evaluation.
 - ✅ **Signing CA deployed** — real trust chain, offline verification working.
-- 🔐 **HSM** — the production design targets a **Thales Luna T3000** (FIPS 140-2 Level 3); validated ahead of hardware against SoftHSM2.
-- 🧪 **Maturity** — proof of concept under active development; not yet a production release.
+- 🔐 **HSM** — the service **currently runs on SoftHSM2** (a software HSM: keys non-extractable via PKCS#11, generated and held in the token). The production design targets a **Thales TCT Luna T-Series (T3000)** (FIPS 140-2 Level 3) — the *same* PKCS#11 code path in tamper-resistant hardware.
+- 🧪 **Maturity** — proof of concept **under active development**; endpoints, keys, and algorithms may change between visits. Not yet a production release.
 
 ## Source & licensing
 

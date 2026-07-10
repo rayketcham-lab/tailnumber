@@ -12,7 +12,7 @@
 set -euo pipefail
 
 ENDPOINT=${TN_ENDPOINT:-https://www.rayketcham.com/CRLs/tailnumber/api/v1}
-KEY=${TN_KEY_LABEL:-tailnumber-legacy-rsa-01}
+KEY=${TN_KEY_LABEL:-tailnumber-codesign-01}
 SIG_ALG=${TN_SIG_ALG:-rsa3072-pss-sha256}
 if [[ -x /opt/openssl-3.5/bin/openssl ]]; then          # pinned build handles ML-DSA
     OSSL=/opt/openssl-3.5/bin/openssl

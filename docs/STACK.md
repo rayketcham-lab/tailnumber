@@ -13,7 +13,7 @@ pinned OpenSSL, and an HSM — not a sprawling dependency tree.
 | **Models / validation** | **Pydantic v2** |
 | **Config** | TOML (stdlib `tomllib`) + a YAML ACL (**PyYAML**) |
 | **Cryptography** | **pinned OpenSSL 3.5.4**, invoked as a subprocess — *no Python crypto library* |
-| **Keys / HSM** | **PKCS#11** — SoftHSM2 (dev/CI) or **Thales Luna T3000** (prod), via `pkcs11-tool` + the OpenSSL pkcs11 engine |
+| **Keys / HSM** | **PKCS#11** — SoftHSM2 (dev/CI) or **Thales TCT Luna T-Series (T3000)** (prod), via `pkcs11-tool` + the OpenSSL pkcs11 engine |
 | **Edge** | Apache / nginx reverse proxy (TLS / mTLS termination); **systemd** service (`tailnumberd`) |
 | **Audit** | Append-only, hash-chained JSONL |
 

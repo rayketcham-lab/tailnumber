@@ -11,7 +11,7 @@ timeline.
 
 ## Posture
 
-- **Keys** are generated inside a Thales Luna T3000 HSM (FIPS 140-2 L3),
+- **Keys** are generated inside a Thales TCT Luna T-Series (T3000) HSM (FIPS 140-2 L3),
   non-extractable, under M-of-N quorum.
 - **Every operation** is written to a hash-chained, tamper-evident audit log.
 - **Signatures** are independently verifiable offline against the published root.

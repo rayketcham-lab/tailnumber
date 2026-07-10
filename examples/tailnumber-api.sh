@@ -6,11 +6,11 @@
 #
 # Config (env, all optional):
 #   TN_ENDPOINT   API root      (default: live service)
-#   TN_KEY_LABEL  signing key   (default: tailnumber-legacy-rsa-01)
+#   TN_KEY_LABEL  signing key   (default: tailnumber-codesign-01)
 #   TN_SIG_ALG    algorithm     (default: rsa3072-pss-sha256)
 set -uo pipefail
 API=${TN_ENDPOINT:-https://www.rayketcham.com/CRLs/tailnumber/api/v1}
-KEY=${TN_KEY_LABEL:-tailnumber-legacy-rsa-01}
+KEY=${TN_KEY_LABEL:-tailnumber-codesign-01}
 ALG=${TN_SIG_ALG:-rsa3072-pss-sha256}
 OSSL=${OSSL:-openssl}
 for t in curl jq "$OSSL"; do command -v "$t" >/dev/null 2>&1 || { echo "need: $t" >&2; exit 3; }; done

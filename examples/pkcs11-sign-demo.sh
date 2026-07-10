@@ -19,7 +19,7 @@ PSS="-pkeyopt digest:sha256 -pkeyopt rsa_padding_mode:pss -pkeyopt rsa_pss_saltl
 step(){ printf '\n\033[1;36m▸ %s\033[0m\n' "$*"; }
 show(){ printf '     $ %s\n' "$*"; }
 
-step "1/6  Create a SoftHSM token (stands in for a Luna T3000 partition)"
+step "1/6  Create a SoftHSM token (stands in for a Luna T-Series partition)"
 show "softhsm2-util --init-token --free --label $LABEL --pin *** --so-pin ***"
 softhsm2-util --init-token --free --label "$LABEL" --pin "$PIN" --so-pin "$SOPIN" | sed 's/^/       /'
 
@@ -52,4 +52,4 @@ show "openssl pkeyutl -verify -pubin -inkey pub.pem -in digest.bin -sigfile sig.
 # shellcheck disable=SC2086
 "$OSSL" pkeyutl -verify -pubin -inkey "$WORK/pub.pem" -in "$WORK/digest.bin" -sigfile "$WORK/sig.bin" $PSS | sed 's/^/       /'
 
-printf '\nThat is the TailNumber Luna backend in miniature: key born in the HSM ->\ndigest signed in the HSM -> verified with the public half. Swap the module for\nlibCryptoki2_64.so and the same commands run on a real Luna T3000.\n'
+printf '\nThat is the TailNumber Luna backend in miniature: key born in the HSM ->\ndigest signed in the HSM -> verified with the public half. Swap the module for\nlibCryptoki2_64.so and the same commands run on a real Luna T-Series.\n'

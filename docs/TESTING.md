@@ -8,7 +8,7 @@ Needs: `curl`, `jq`, `openssl`.
 ```bash
 API=https://www.rayketcham.com/CRLs/tailnumber/api/v1   # the service
 FILE=yourfile.bin                                       # the file you want to sign
-KEY=tailnumber-legacy-rsa-01                            # signing key (see table at the bottom)
+KEY=tailnumber-codesign-01                              # signing key (list live ones: curl -s $API/keys | jq -r '.keys[].label')
 ALG=rsa3072-pss-sha256                                  # signature algorithm
 DIGEST=sha256                                           # hash: sha256 for RSA · sha384 for ML-DSA
 ENV=envelope.sig.json                                   # where the signed envelope is saved
@@ -79,10 +79,15 @@ TN_ITERS=1000 TN_VERIFY=0 TN_TAMPER=0 ./tailnumber-loadtest.sh   # throughput-fo
 
 ## Keys & algorithms
 
+Run `curl -s $API/keys | jq -r '.keys[].label'` for the live list — keys can change (this is a POC).
+
 | `KEY` | `ALG` | `DIGEST` |
 |---|---|---|
-| `tailnumber-legacy-rsa-01` | `rsa3072-pss-sha256` (or `rsa3072-pkcs1-sha256`) | `sha256` |
-| `tailnumber-codesign-01` | `ml-dsa-65` *(post-quantum)* | `sha384` |
+| `tailnumber-codesign-01` | `rsa3072-pss-sha256` (or `rsa3072-pkcs1-sha256`) | `sha256` |
 
+> ECDSA P-384 (`ecdsa-p384-sha384`, `sha384`) and post-quantum ML-DSA-65/87 are supported by the
+> service, but need a key of that family. The current SoftHSM validation backend is classical-only
+> (RSA); ECDSA/ML-DSA keys live on the Luna backend.
+>
 > For PKCS#11 (signing in a token/HSM) the algorithm is named as a **mechanism** instead —
 > `rsa3072-pss-sha256` becomes `CKM_SHA256_RSA_PKCS_PSS` (`pkcs11-tool` calls it `SHA256-RSA-PKCS-PSS`).
