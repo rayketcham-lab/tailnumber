@@ -81,6 +81,8 @@ New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkt
 
 **Want to test it yourself?** Follow **[docs/TESTING.md](docs/TESTING.md)** — sign a file, verify the signature, confirm the **file matches its envelope**, and prove **tamper-detection**, all copy-paste. In the dashboard, *Verify an envelope* now takes the **original file** and reports **✓ AUTHENTIC** (the file is hashed in your browser, never uploaded).
 
+**Prefer the API?** The service exposes **~50 endpoints** — discovery, keys & trust material, single **and batch** sign/verify, the one-shot **`/verify/authentic`** ("is this file authentic?") check, and audit forensics. Every one is copy-paste in **[docs/API-COMMANDS.md](docs/API-COMMANDS.md)**, or drive them all from a single CLI, **[`examples/tailnumber-api.sh`](examples/tailnumber-api.sh)** (`sign` · `verify` · `sign-batch` · `verify-batch` · `keys` · `chain` · `algorithms` · …). Full interactive spec at [`/docs`](https://www.rayketcham.com/CRLs/tailnumber/docs) · [`/openapi.json`](https://www.rayketcham.com/CRLs/tailnumber/openapi.json).
+
 ## Features
 
 | | |
