@@ -21,8 +21,8 @@
 ## TL;DR
 
 - **What it is** — a service that **digitally signs** software artifacts (firmware, packages, documents) and lets anyone **verify** them later.
-- **How it works** — you send a **hash** of your file (not the file itself); the service signs that hash with a hardware-protected key and returns a small, portable **proof** you can verify anywhere — even offline.
-- **What makes it different** — **post-quantum** *and* **hybrid** (classical + PQC) signatures, a trust chain valid for **50 years**, and private keys that **never leave the hardware**.
+- **How it works** — you send a **hash** of your file (not the file itself); the service signs that hash with a non-extractable key held in a security module (HSM) and returns a small, portable **proof** you can verify anywhere — even offline.
+- **What makes it different** — **post-quantum** *and* **hybrid** (classical + PQC) signatures, a trust chain valid for **50 years**, and private keys that are **non-extractable** — generated inside the security module and never exported.
 - **See it now** — [**live dashboard**](https://www.rayketcham.com/CRLs/tailnumber/db/) · [API docs](https://www.rayketcham.com/CRLs/tailnumber/docs)
 
 ---
@@ -34,14 +34,14 @@ Aerospace software has to be **trusted for the life of the airframe** — 30, 40
 1. **Certificates expire.** Off-the-shelf signing certs last 1–3 years; the platform lasts decades.
 2. **Quantum computers are coming.** Today's RSA/ECDSA signatures may be forgeable by future quantum machines — a real risk for anything that must stay trustworthy for 50 years.
 
-TailNumber is built for exactly this: **long-lived, post-quantum, hardware-anchored** signing.
+TailNumber is built for exactly this: **long-lived, post-quantum, HSM-anchored** signing (a SoftHSM software-HSM today, Thales Luna hardware in production).
 
 ## How it works
 
 Three steps — and your file never leaves your machine:
 
 1. **Hash** — you compute a digest (fingerprint) of your artifact locally.
-2. **Sign** — you send only the digest; a key held inside a hardware security module (HSM) signs it.
+2. **Sign** — you send only the digest; a **non-extractable** key inside a security module (HSM) signs it.
 3. **Verify** — you get back a portable **envelope** (`.sig.json`) that anyone can check against the public trust root — through the service *or* offline with just OpenSSL.
 
 ```mermaid
@@ -53,7 +53,7 @@ flowchart LR
     F -->|"stays local"| H
   end
   H -->|"send only the hash"| API["② TailNumber"]
-  API --> HSM["③ Sign in the HSM<br/>key never leaves hardware"]
+  API --> HSM["③ Sign in the HSM<br/>key is non-extractable"]
   HSM --> ENV["④ Envelope (.sig.json)<br/>signature · certificate · digest"]
   ENV --> VER["⑤ Verify<br/>service — or offline with OpenSSL"]
   subgraph CA["Trust anchor"]
@@ -93,7 +93,7 @@ New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkt
 | 🗝️ **Governed keys** | Keys are minted **on-box only** (never via the API), capturing provenance: creator, reason, PMA/TSO approval, DO-178C level. |
 | 📎 **Detached** | Signs a hash, never the file — huge or classified artifacts stay on your side. |
 | 🔓 **Offline-verifiable** | Every proof checks out with nothing but OpenSSL + the public root. |
-| 🔐 **Hardware-anchored** | Signing keys are generated inside an HSM and never leave it. |
+| 🔐 **HSM-anchored** | Keys are generated inside the HSM and are non-extractable — they never leave the token. *SoftHSM (software HSM) today; Luna hardware in production.* |
 | 📜 **Tamper-evident** | Every operation is written to a hash-chained audit log, re-verified on read. |
 | 🔗 **Interoperable** | The same signature re-serializes as JWS, COSE, or CMS — no lock-in. |
 
