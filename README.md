@@ -18,6 +18,33 @@
 
 ---
 
+## ⚡ Quick start — sign & verify in two commands
+
+No signup, no SDK — the live service is open for evaluation. Only a **hash** is sent; your file never leaves your machine. Needs `curl`, `jq`, `openssl`.
+
+```bash
+API=https://www.rayketcham.com/CRLs/tailnumber/api/v1
+FILE=yourfile.bin        # any file — e.g.  echo hello > yourfile.bin
+
+# ① SIGN — hash locally, send only the digest, keep the returned proof (the envelope)
+curl -s -X POST $API/sign -H 'content-type: application/json' \
+  -d "$(jq -nc --arg d "sha256=$(openssl dgst -sha256 "$FILE" | awk '{print $NF}')" \
+        '{key_label:"tailnumber-codesign-01", sig_alg:"rsa3072-pss-sha256", digest_alg:"sha256", digest:$d}')" \
+  | tee "$FILE.sig.json" | jq '{signed_at, key: .key.label, signature: (.signature[0:44] + "…")}'
+
+# ② VERIFY — one call: signature valid + chains to the root + matches this exact file
+curl -s -X POST $API/verify/authentic -H 'content-type: application/json' \
+  -d "$(jq -nc --argjson e "$(cat "$FILE.sig.json")" \
+        --arg d "sha256=$(openssl dgst -sha256 "$FILE" | awk '{print $NF}')" \
+        '{envelope: $e, digest: $d}')" | jq .
+# => { "authentic": true, "signature_valid": true, "chain_ok": true, "digest_matches": true, "signer": { … } }
+```
+
+**Prove it:** change one byte of the file and run ② again — `"authentic"` flips to `false`.
+Go deeper: [docs/TESTING.md](docs/TESTING.md) · every endpoint in [docs/API-COMMANDS.md](docs/API-COMMANDS.md) · keys can change while this POC is in development — list what's live: `curl -s $API/keys | jq -r '.keys[].label'`
+
+---
+
 ## TL;DR
 
 - **What it is** — a service that **digitally signs** software artifacts (firmware, packages, documents) and lets anyone **verify** them later.
