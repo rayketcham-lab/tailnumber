@@ -41,6 +41,32 @@ curl -s -X POST $API/verify/authentic -H 'content-type: application/json' \
 ```
 
 **Prove it:** change one byte of the file and run ② again — `"authentic"` flips to `false`.
+
+**③ Don't trust the service? Get the same verdict offline — nothing but OpenSSL:**
+
+```bash
+# unpack the envelope: signer cert → public key, and the raw signature
+jq -r '.cert_chain[0]' "$FILE.sig.json" > signer.crt
+openssl x509 -in signer.crt -pubkey -noout > signer.pub
+jq -r '.signature' "$FILE.sig.json" | sed 's/^b64://' | base64 -d > sig.bin
+
+# FILE ↔ SIGNATURE MATCH — hash the file YOURSELF, compare to the digest that was signed
+openssl dgst -sha256 -binary "$FILE" > digest.bin
+jq -r '.digest.value' "$FILE.sig.json" | sed 's/^b64://' | base64 -d | cmp - digest.bin \
+  && echo "file matches the signed digest ✓"
+
+# SIGNATURE VERIFICATION — is it genuine over exactly that digest? (the public key does the talking)
+openssl pkeyutl -verify -pubin -inkey signer.pub -in digest.bin -sigfile sig.bin \
+  -pkeyopt digest:sha256 -pkeyopt rsa_padding_mode:pss -pkeyopt rsa_pss_saltlen:auto
+# => Signature Verified Successfully        (any change to the file → Signature Verification Failure)
+
+# optional: anchor it — chain the signer to the published TailNumber root
+curl -s $API/ca/root > root.crt
+jq -r '.cert_chain[1]' "$FILE.sig.json" > issuing.crt
+openssl verify -CAfile root.crt -untrusted issuing.crt signer.crt
+# => signer.crt: OK
+```
+
 Go deeper: [docs/TESTING.md](docs/TESTING.md) · every endpoint in [docs/API-COMMANDS.md](docs/API-COMMANDS.md) · keys can change while this POC is in development — list what's live: `curl -s $API/keys | jq -r '.keys[].label'`
 
 ---
