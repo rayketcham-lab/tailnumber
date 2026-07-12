@@ -3,6 +3,9 @@
 Every useful endpoint with a copy-paste `curl`. **Open for evaluation** — no auth header needed.
 Only a hash is sent for signing; your files never leave your machine. Needs `curl`, `jq`, `openssl`.
 
+> **macOS:** the examples use GNU `base64 -w0` / `base64 -d`. On macOS use `base64` (already unwrapped)
+> or `openssl base64 -A` to encode, and `base64 -D` to decode. Everything else is identical.
+
 ```bash
 API=https://www.rayketcham.com/CRLs/tailnumber/api/v1
 KEY=tailnumber-codesign-01     # a signing key that exists — list them any time with:

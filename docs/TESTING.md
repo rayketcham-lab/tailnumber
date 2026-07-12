@@ -1,7 +1,7 @@
 # Testing TailNumber — sign, verify a file, and prove tamper-detection
 
 Copy-paste steps for evaluators. **Only a hash is sent — your file never leaves your machine.**
-Needs: `curl`, `jq`, `openssl`.
+Needs: `curl`, `jq`, `openssl`. *(macOS: `base64 -d` → `base64 -D`; `base64 -w0` → `openssl base64 -A`.)*
 
 ## 0 · Configure
 
