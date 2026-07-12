@@ -13,7 +13,7 @@ KEY=tailnumber-codesign-01     # a signing key that exists — list them any tim
 > backends can change between visits**. If a command 404s on a key label, list what's live
 > (`curl -s $API/keys | jq -r '.keys[].label'`); the authoritative endpoint list is always
 > [`/openapi.json`](https://www.rayketcham.com/CRLs/tailnumber/openapi.json). Last fact-checked
-> end-to-end against the live service on **2026-07-10** (backend: SoftHSM, one RSA-3072 signer).
+> end-to-end against the live service on **2026-07-12** (backend: SoftHSM, one RSA-3072 signer).
 
 > **TL;DR — one CLI for all of this:** [`examples/tailnumber-api.sh`](../examples/tailnumber-api.sh)
 > wraps every command below (`tailnumber-api.sh sign|verify|sign-batch|keys|chain|algorithms|…`).
@@ -140,6 +140,30 @@ curl -s -X POST $API/verify/batch -H 'content-type: application/json' -d @batch-
 # compute a digest server-side over supplied base64 data (client-side openssl is usually better)
 curl -s -X POST $API/hash -H 'content-type: application/json' \
   -d "$(jq -nc --arg data "$(base64 -w0 < "$FILE")" '{digest_alg:"sha256", data:$data}')" | jq .
+```
+
+## Identity, ACL & config (read-only)
+
+```bash
+curl -s $API/whoami            | jq .   # your resolved identity, groups, role
+curl -s $API/identities        | jq .   # all known identities (CN → groups / role)
+curl -s $API/whois/rketcham    | jq .   # one identity: groups, role, key globs
+curl -s $API/acl               | jq .   # full ACL: identities + groups
+curl -s $API/acl/groups        | jq .   # groups → role + key globs
+curl -s $API/acl/roles         | jq .   # defined roles
+curl -s $API/config            | jq .   # effective NON-secret config (backend, paths) — admin
+curl -s $API/changelog                  # service changelog (markdown, not JSON)
+```
+
+## Audit forensics (tamper-evident, hash-chained)
+
+```bash
+curl -s "$API/audit?limit=20"             | jq .   # recent entries + chain status
+curl -s "$API/audit/42"                   | jq .   # one entry by sequence number
+curl -s "$API/audit/search?action=sign&limit=50" | jq .   # filter by action / key / actor / result
+curl -s $API/audit/stats                  | jq .   # counts by action / result / actor / key
+curl -s $API/audit/verify                 | jq .   # re-verify the whole hash chain now
+curl -s "$API/audit/export?limit=1000"    > audit.json    # export the chain (backup / SIEM)
 ```
 
 ## Admin (mutations & forensics — require the admin role)
