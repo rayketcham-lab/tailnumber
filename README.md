@@ -14,7 +14,7 @@
 
 </div>
 
-> **⚠️ Proprietary — source available on request.** This is the public overview; the implementation is private. No rights are granted to use, copy, or deploy — see [`LICENSE`](LICENSE). The **live demo** is open for evaluation. © 2026 rayketcham-lab.
+> **⚠️ Proprietary — closed source.** This is the public overview; the implementation is private and **not distributed**. No rights are granted to use, copy, or deploy — see [`LICENSE`](LICENSE). The **live demo** is open for evaluation. © 2026 rayketcham-lab.
 
 ---
 
@@ -199,7 +199,7 @@ Yes. Any envelope verifies **offline** with standard OpenSSL against the publish
 Because an aircraft's software must stay verifiable for the life of the aircraft. A signature has to **outlive what it signs**.
 
 **Is the source code available?**
-The implementation is **private**. The live demo is open for evaluation, and source access / licensing is available **on request**.
+**No.** The implementation is **private and closed-source**, and is not distributed. The live demo is open for evaluation — the source itself is not available.
 
 ## Project status
 
@@ -208,8 +208,8 @@ The implementation is **private**. The live demo is open for evaluation, and sou
 - 🔐 **HSM** — the service **currently runs on SoftHSM2** (a software HSM: keys non-extractable via PKCS#11, generated and held in the token). The production design targets a **Thales TCT Luna T-Series (T3000)** (FIPS 140-2 Level 3) — the *same* PKCS#11 code path in tamper-resistant hardware.
 - 🧪 **Maturity** — proof of concept **under active development**; endpoints, keys, and algorithms may change between visits. Not yet a production release.
 
-## Source & licensing
+## Source
 
-The service, CA tooling, HSM backend, and deployment live in a **private, access-controlled repository**. This page is the public overview; the live demo is open. For source access or licensing, **contact the maintainers**.
+The service, CA tooling, HSM backend, and deployment live in a **private, access-controlled repository** and are **not distributed**. This page is the public overview; the live demo is open for evaluation. The source is not available.
 
 **Proprietary — © 2026 rayketcham-lab. All rights reserved.**
