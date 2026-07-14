@@ -132,9 +132,9 @@ The service is running — evaluate it without any source:
 
 New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkthrough.
 
-**Want to test it yourself?** Follow **[docs/TESTING.md](docs/TESTING.md)** — sign a file, verify the signature, confirm the **file matches its envelope**, and prove **tamper-detection**, all copy-paste. In the dashboard, *Verify an envelope* now takes the **original file** and reports **✓ AUTHENTIC** (the file is hashed in your browser, never uploaded).
+**Want to test it yourself?** Follow **[docs/TESTING.md](docs/TESTING.md)** — sign a file, verify the signature, confirm the **file matches its envelope**, and prove **tamper-detection**, all copy-paste. In the dashboard, *Verify an envelope* takes the **original file** and reports **✓ AUTHENTIC** (the file is hashed in your browser, never uploaded).
 
-**Prefer the API?** The service exposes **~50 endpoints** — discovery, keys & trust material, single **and batch** sign/verify, the one-shot **`/verify/authentic`** ("is this file authentic?") check, and audit forensics. Every one is copy-paste in **[docs/API-COMMANDS.md](docs/API-COMMANDS.md)**, or drive them all from a single CLI, **[`examples/tailnumber-api.sh`](examples/tailnumber-api.sh)** (`sign` · `verify` · `sign-batch` · `verify-batch` · `keys` · `chain` · `algorithms` · …). Full interactive spec at [`/docs`](https://www.rayketcham.com/CRLs/tailnumber/docs) · [`/openapi.json`](https://www.rayketcham.com/CRLs/tailnumber/openapi.json).
+**Prefer the API?** The service exposes **~50 endpoints** — discovery, keys & trust material, single **and batch** sign/verify, the one-shot **`/verify/authentic`** ("is this file authentic?") check, and audit forensics. Every one is copy-paste in **[docs/API-COMMANDS.md](docs/API-COMMANDS.md)**, or drive them all from a single CLI, **[`examples/tailnumber-api.sh`](examples/tailnumber-api.sh)** (`sign` · `verify` · `sign-batch` · `verify-batch` · `keys` · `chain` · `algorithms` · …). Full interactive spec at [`/docs`](https://www.rayketcham.com/CRLs/tailnumber/docs) · [`/openapi.json`](https://www.rayketcham.com/CRLs/tailnumber/openapi.json). Want proof it all works? **[`examples/verify-all-commands.sh`](examples/verify-all-commands.sh)** runs every documented command against the live service and prints a pass/fail scorecard.
 
 ## Features
 
@@ -149,6 +149,8 @@ New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkt
 | 🔐 **HSM-anchored** | Keys are generated inside the HSM and are non-extractable — they never leave the token. *SoftHSM (software HSM) today; Luna hardware in production.* |
 | 📜 **Tamper-evident** | Every operation is written to a hash-chained audit log, re-verified on read. |
 | 🔗 **Interoperable** | The same signature re-serializes as JWS, COSE, or CMS — no lock-in. |
+
+*On the live demo today (SoftHSM2, classical), **RSA-3072** signing is active; **ML-DSA** (post-quantum), **hybrid**, and **ECDSA P-384** run on the Luna backend — see [Project status](#project-status). List what's live: `curl -s $API/keys | jq -r '.keys[].label'`.*
 
 ## Built to outlive the airframe
 
@@ -168,7 +170,7 @@ TailNumber's envelope is deliberately minimal, but the signature inside is stand
 
 ## Tech stack & build
 
-Built for a **minimal, auditable surface**: **Python 3.12** + **FastAPI / uvicorn**, one **pinned OpenSSL 3.5.4** for *all* cryptography (including post-quantum ML-DSA), and **PKCS#11** for keys — **SoftHSM2** today, a **Thales TCT Luna T-Series (T3000)** in production. Three direct Python dependencies, and no Python crypto library. The full stack, dependencies, server requirements, and runnable client scripts are in **[docs/STACK.md](docs/STACK.md)** — including two step-by-step examples: an API signer that prints an envelope to paste into the WebUI, and a SoftHSM/PKCS#11 in-token signing demo.
+Built for a **minimal, auditable surface**: **Python 3.12** + **FastAPI / uvicorn**, a **pinned OpenSSL 3.5.4** for post-quantum ML-DSA and offline verification, and **PKCS#11** for in-token signing — **SoftHSM2** today, a **Thales TCT Luna T-Series (T3000)** in production. Three direct Python dependencies, and no Python crypto library. The full stack, dependencies, server requirements, and runnable client scripts are in **[docs/STACK.md](docs/STACK.md)** — including two step-by-step examples: an API signer that prints an envelope to paste into the WebUI, and a SoftHSM/PKCS#11 in-token signing demo.
 
 ## FAQ
 
