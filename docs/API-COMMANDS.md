@@ -206,5 +206,18 @@ cd examples
 
 **Other algorithms:** the signer key fixes the family — `tailnumber-codesign-01` is **RSA-3072**
 (`rsa3072-pss-sha256` / `rsa3072-pkcs1-sha256`). ECDSA P-384 and post-quantum **ML-DSA-65/87** are
-supported by the service, but need a key of that type: run `curl -s $API/keys` to see which are live.
-On the SoftHSM validation backend only RSA is available; ECDSA/ML-DSA keys live on the Luna backend.
+supported by the service, but need a key of that type. On the SoftHSM validation backend only RSA is
+available; ECDSA/ML-DSA keys live on the Luna backend.
+
+Ask the service rather than guessing — `/algorithms` marks each entry `available` against the keys
+actually loaded, and both meta endpoints return an `available_algorithms` list:
+
+```bash
+curl -s $API/algorithms | jq -r '.available_algorithms[]'     # what you can sign with right now
+curl -s $API/algorithms | jq -r '.algorithms[] | select(.available|not) | .sig_alg'   # needs a key
+curl -s $API/capabilities | jq '{post_quantum, post_quantum_supported, available_algorithms}'
+```
+
+`algorithms[]` / `capabilities.algorithms` list what this **build** implements; `available_algorithms`
+and `capabilities.post_quantum` describe what this **deployment** can do right now. Asking for an
+unavailable one returns `sig_alg <x> incompatible with key <label> (type <t>)`.
