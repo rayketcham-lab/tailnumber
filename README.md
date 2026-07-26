@@ -148,9 +148,9 @@ New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkt
 | 🔓 **Offline-verifiable** | Every proof checks out with nothing but OpenSSL + the public root. |
 | 🔐 **HSM-anchored** | Keys are generated inside the HSM and are non-extractable — they never leave the token. *SoftHSM (software HSM) today; Luna hardware in production.* |
 | 📜 **Tamper-evident** | Every operation is written to a hash-chained audit log, re-verified on read. |
-| 🔗 **Interoperable** | The same signature re-serializes as JWS, COSE, or CMS — no lock-in. |
+| 🔗 **Interoperable** | The envelope is a wrapper, not a lock-in — the same signature bytes and X.509 chain map cleanly onto JWS, COSE, or CMS/PKCS#7. *Emitters are a roadmap item; the mapping is specified in [docs/INTEROP.md](docs/INTEROP.md).* |
 
-*On the live demo today (SoftHSM2, classical), **RSA-3072** signing is active; **ML-DSA** (post-quantum), **hybrid**, and **ECDSA P-384** run on the Luna backend — see [Project status](#project-status). List what's live: `curl -s $API/keys | jq -r '.keys[].label'`.*
+*On the live demo today, **RSA-3072** (`rsa3072-pss-sha256` / `rsa3072-pkcs1-sha256`) is the only active algorithm — the demo holds a single RSA-3072 key in SoftHSM2. **RSA-4096**, **ECDSA P-384**, **ML-DSA**, and **hybrid** each require a key of that family and run on Luna **hardware**, not on this demo; asking for one here returns a clear `incompatible with key` error. All of them are exercised end-to-end in the project's acceptance suite — see [Project status](#project-status). List what's live: `curl -s $API/keys | jq -r '.keys[].label'`.*
 
 ## Built to outlive the airframe
 
@@ -166,7 +166,7 @@ Each tier of the trust chain outlives the one below, so a signature stays verifi
 
 ## Standards & interoperability
 
-TailNumber's envelope is deliberately minimal, but the signature inside is standards-grade: the same HSM-backed, certificate-chained signature can be re-emitted as a detached **JWS**, a **COSE** object, or a **CMS/PKCS#7** `.p7s` — the wrapper changes, the trust root doesn't. Full spec + a mapping against JWT / JWS · JAdES · COSE · CMS · DSSE is in **[docs/INTEROP.md](docs/INTEROP.md)**.
+TailNumber's envelope is deliberately minimal, but the signature inside is standards-grade: the same HSM-backed, certificate-chained signature can be re-emitted as a detached **JWS**, a **COSE** object, or a **CMS/PKCS#7** `.p7s` — the wrapper changes, the trust root doesn't. **These emitters are not yet implemented**; the service ships `.sig.json` today, and the format mapping — against JWT / JWS · JAdES · COSE · CMS · DSSE, with fit and effort per target — is specified in **[docs/INTEROP.md](docs/INTEROP.md)** §8.
 
 ## Tech stack & build
 
@@ -206,6 +206,7 @@ Because an aircraft's software must stay verifiable for the life of the aircraft
 - ✅ **Live** — the demo above is running and open for evaluation.
 - ✅ **Signing CA deployed** — real trust chain, offline verification working.
 - 🔐 **HSM** — the service **currently runs on SoftHSM2** (a software HSM: keys non-extractable via PKCS#11, generated and held in the token). The production design targets a **Thales TCT Luna T-Series (T3000)** (FIPS 140-2 Level 3) — the *same* PKCS#11 code path in tamper-resistant hardware.
+- 🔑 **Algorithms on this demo** — SoftHSM2 is classical-only, so the live demo signs with **RSA-3072** and nothing else. ML-DSA (post-quantum), ECDSA P-384, RSA-4096, and hybrid are implemented and covered by the acceptance suite, but need Luna hardware to run here.
 - 🧪 **Maturity** — proof of concept **under active development**; endpoints, keys, and algorithms may change between visits. Not yet a production release.
 
 ## Source
