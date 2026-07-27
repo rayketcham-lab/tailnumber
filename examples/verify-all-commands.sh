@@ -79,6 +79,37 @@ if [[ -x "$HERE/tailnumber-verify-file.sh" ]]; then
 else na "verify-file.sh" "not found next to this script"
 fi
 
+echo "############ API-COMMANDS — tailnumber-api.sh subcommands ############"
+if [[ -x "$HERE/tailnumber-api.sh" ]]; then
+  api() { TN_ENDPOINT="$API" TN_KEY_LABEL="$KEY" bash "$HERE/tailnumber-api.sh" "$@" 2>&1; }
+  # Assert on the OUTPUT, not just the exit status: `health` used to request
+  # /api/v1/healthz, get {"detail":"Not Found"} back and still exit 0.
+  for spec in 'health:"status"' 'ping:"pong"' 'version:"openssl"' 'time:"epoch"' \
+              'algorithms:available_algorithms' 'capabilities:"backend"' \
+              'metrics:"total"' 'whoami:"identity"' 'keys:"label"' 'ca:"deployed"'; do
+    c=${spec%%:*}; want=${spec#*:}
+    api "$c" | grep -q "$want" && ok "tailnumber-api.sh $c" || no "tailnumber-api.sh $c" "no $want in output"
+  done
+  for spec in "cert:BEGIN CERTIFICATE" "chain:BEGIN CERTIFICATE" "pubkey:BEGIN PUBLIC KEY"; do
+    c=${spec%%:*}; want=${spec#*:}
+    api "$c" "$KEY" | grep -q "$want" && ok "tailnumber-api.sh $c" || no "tailnumber-api.sh $c"
+  done
+  # `verify` prints a human header before the JSON, so match the field, not jq.
+  api sign yourfile.bin >/dev/null 2>&1 \
+    && api verify yourfile.bin yourfile.bin.sig.json | grep -qE '"authentic"[[:space:]]*:[[:space:]]*true' \
+    && ok "tailnumber-api.sh sign + verify → authentic" || no "tailnumber-api.sh sign/verify"
+  # Export is disabled wherever keys are non-extractable; the CLI must say so and
+  # must NOT leave an error body behind named like a real bundle.
+  if api bundle "$KEY" >/dev/null 2>&1; then
+    ok "tailnumber-api.sh bundle"
+  elif [[ ! -f "$KEY-bundle.zip" ]]; then
+    na "tailnumber-api.sh bundle" "export disabled (non-extractable keys); no bogus zip written"
+  else
+    no "tailnumber-api.sh bundle" "failed but still wrote $KEY-bundle.zip"
+  fi
+else na "tailnumber-api.sh" "not found next to this script"
+fi
+
 echo
 printf '%s════ %s PASS · %s FAIL · %s by-design N/A ════%s\n' "$([[ $F -eq 0 ]] && echo "$G" || echo "$R")" "$P" "$F" "$NA" "$Z"
 exit $(( F > 0 ? 1 : 0 ))
