@@ -20,8 +20,10 @@ digest_for() { case "$1" in
   rsa3072-*|*-sha256) echo sha256 ;; rsa4096-*|ecdsa-p384-*|ml-dsa-65|*-sha384) echo sha384 ;;
   ml-dsa-87|*-sha512) echo sha512 ;; *) echo sha256 ;; esac; }
 
+ROOT=${API%/api/v1}                                                        # service root
 get()  { curl -sS "$API$1"; }                                              # GET, JSON
 getp() { curl -sS "$API$1"; }                                              # GET, plain (PEM/text)
+getr() { curl -sS "$ROOT$1"; }                                             # GET at the root, not under /api/v1
 post() { curl -sS -X POST "$API$1" -H 'content-type: application/json' -d "$2"; }
 jqok() { jq . 2>/dev/null || cat; }                                        # pretty if JSON
 
@@ -46,7 +48,7 @@ EOF
 
 cmd=${1:-help}; shift || true
 case "$cmd" in
-  health)       get /healthz | jqok ;;
+  health)       getr /healthz | jqok ;;   # /healthz lives at the service root, NOT under /api/v1
   ping)         get /ping | jqok ;;
   version)      get /version | jqok ;;
   time)         get /time | jqok ;;
@@ -59,7 +61,14 @@ case "$cmd" in
   cert)         getp "/keys/$1/certificate" ;;
   chain)        getp "/keys/$1/chain" ;;
   pubkey)       getp "/keys/$1/publickey" ;;
-  bundle)       out=${2:-$1-bundle.zip}; curl -sS "$API/keys/$1/bundle" -o "$out" && echo "saved $out" ;;
+                # curl -o writes the body whatever the status, so a 404 would land
+                # in the .zip and still report success. Check the code, and on an
+                # error print the server's reason instead of leaving a fake zip.
+  bundle)       out=${2:-$1-bundle.zip}
+                code=$(curl -sS -w '%{http_code}' "$API/keys/$1/bundle" -o "$out")
+                if [[ $code == 2* ]]; then echo "saved $out"
+                else echo "${R}bundle unavailable (HTTP $code)${Z} $(jq -r '.detail // empty' "$out" 2>/dev/null)" >&2
+                     rm -f "$out"; exit 1; fi ;;
   ca)           get /ca | jqok ;;
   ca-chain)     getp /ca/chain ;;
   root)         getp /ca/root ;;

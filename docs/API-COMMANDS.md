@@ -16,11 +16,21 @@ KEY=tailnumber-codesign-01     # a signing key that exists — list them any tim
 > backends can change between visits**. If a command 404s on a key label, list what's live
 > (`curl -s $API/keys | jq -r '.keys[].label'`); the authoritative endpoint list is always
 > [`/openapi.json`](https://www.rayketcham.com/CRLs/tailnumber/openapi.json). Last fact-checked
-> end-to-end against the live service on **2026-07-12** (backend: SoftHSM, one RSA-3072 signer).
+> end-to-end against the live service on **2026-07-27** (backend: SoftHSM, one RSA-3072 signer):
+> every command on this page was executed in order, and every subcommand of
+> [`tailnumber-api.sh`](../examples/tailnumber-api.sh) was run.
+
+> **On this deployment** only **RSA-3072** signing is live (`rsa3072-pss-sha256` /
+> `rsa3072-pkcs1-sha256`). The hybrid commands below need an ML-DSA key, and key export
+> (`bundle` / `pfx`) is disabled because SoftHSM keys are non-extractable — both are marked
+> where they appear. Ask the service what it can do right now:
+> `curl -s $API/algorithms | jq -r '.available_algorithms[]'`.
 
 > **TL;DR — one CLI for all of this:** [`examples/tailnumber-api.sh`](../examples/tailnumber-api.sh)
 > wraps every command below (`tailnumber-api.sh sign|verify|sign-batch|keys|chain|algorithms|…`).
-> Full interactive docs live at [`/docs`](https://www.rayketcham.com/CRLs/tailnumber/docs) (Swagger).
+> Full interactive docs live at [`/docs`](https://www.rayketcham.com/CRLs/tailnumber/docs) — a
+> three-column reference with per-endpoint **Try it** panels; the Swagger UI is at
+> [`/docs/swagger`](https://www.rayketcham.com/CRLs/tailnumber/docs/swagger).
 
 ---
 
@@ -61,7 +71,7 @@ curl -s $API/ca/chain             # Issuing + Root bundle (PEM) — what a verif
 ## Sign
 
 ```bash
-FILE=yourfile.bin
+FILE=yourfile.bin           # any file of yours — e.g.  echo hello > yourfile.bin
 ALG=rsa3072-pss-sha256      # this key is RSA-3072; see $API/keys/$KEY for its sig_algs
 DIGEST=sha256
 
@@ -87,11 +97,13 @@ curl -s -X POST $API/sign/data -H 'content-type: application/json' -d "$(jq -nc 
   '{key_label:$k, sig_alg:$a, data:$data}')" | jq .
 
 # hybrid: one digest signed by a classical AND a post-quantum (ML-DSA) key — valid while
-# EITHER algorithm holds. Needs BOTH an RSA/ECDSA key and an ml-dsa-* key; ML-DSA lives on
-# the Luna backend, so this errors on the classical-only SoftHSM validation backend.
+# EITHER algorithm holds. Needs BOTH an RSA/ECDSA key and an ml-dsa-* key. ML-DSA requires
+# Luna hardware, so on this SoftHSM demo the ML-DSA label below does not exist and the call
+# returns 404 "unknown key" — that is the expected answer here, not a broken example.
+# Substitute your own labels: curl -s $API/keys | jq -r '.keys[].label'
 curl -s -X POST $API/sign/hybrid -H 'content-type: application/json' -d "$(jq -nc \
-  --arg g "sha384=$(openssl dgst -sha384 "$FILE" | awk '{print $NF}')" \
-  '{classical_label:"<rsa-or-ecdsa-key>", pqc_label:"<ml-dsa-key>", digest_alg:"sha384", digest:$g}')" | jq .
+  --arg c "$KEY" --arg g "sha256=$(openssl dgst -sha256 "$FILE" | awk '{print $NF}')" \
+  '{classical_label:$c, pqc_label:"spec42-mldsa87-01", digest_alg:"sha256", digest:$g}')" | jq .
 ```
 
 ## Verify
