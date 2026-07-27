@@ -90,14 +90,27 @@ if [[ -x "$HERE/tailnumber-api.sh" ]]; then
     c=${spec%%:*}; want=${spec#*:}
     api "$c" | grep -q "$want" && ok "tailnumber-api.sh $c" || no "tailnumber-api.sh $c" "no $want in output"
   done
-  for spec in "cert:BEGIN CERTIFICATE" "chain:BEGIN CERTIFICATE" "pubkey:BEGIN PUBLIC KEY"; do
+  for spec in 'ca-chain:BEGIN CERTIFICATE' 'root:BEGIN CERTIFICATE' 'help:subcommand|sign'; do
+    c=${spec%%:*}; want=${spec#*:}
+    api "$c" | grep -qE "$want" && ok "tailnumber-api.sh $c" || no "tailnumber-api.sh $c"
+  done
+  for spec in "key:key_type" "cert:BEGIN CERTIFICATE" "chain:BEGIN CERTIFICATE" "pubkey:BEGIN PUBLIC KEY"; do
     c=${spec%%:*}; want=${spec#*:}
     api "$c" "$KEY" | grep -q "$want" && ok "tailnumber-api.sh $c" || no "tailnumber-api.sh $c"
   done
+  api hash yourfile.bin | grep -qE '^sha256=[0-9a-f]{64}$' \
+    && ok "tailnumber-api.sh hash" || no "tailnumber-api.sh hash"
+  api raw GET /capabilities | jq -e '.backend' >/dev/null \
+    && ok "tailnumber-api.sh raw" || no "tailnumber-api.sh raw"
   # `verify` prints a human header before the JSON, so match the field, not jq.
   api sign yourfile.bin >/dev/null 2>&1 \
     && api verify yourfile.bin yourfile.bin.sig.json | grep -qE '"authentic"[[:space:]]*:[[:space:]]*true' \
     && ok "tailnumber-api.sh sign + verify → authentic" || no "tailnumber-api.sh sign/verify"
+  echo 'second artifact' > second.bin
+  api sign-batch yourfile.bin second.bin >/dev/null 2>&1 && [[ -f second.bin.sig.json ]] \
+    && ok "tailnumber-api.sh sign-batch" || no "tailnumber-api.sh sign-batch"
+  api verify-batch yourfile.bin second.bin | grep -qE '2/2 authentic' \
+    && ok "tailnumber-api.sh verify-batch → 2/2" || no "tailnumber-api.sh verify-batch"
   # Export is disabled wherever keys are non-extractable; the CLI must say so and
   # must NOT leave an error body behind named like a real bundle.
   if api bundle "$KEY" >/dev/null 2>&1; then

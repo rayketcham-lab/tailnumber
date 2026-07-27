@@ -9,12 +9,20 @@
 &nbsp;![HSM](https://img.shields.io/badge/keys-SoftHSM2%20%E2%86%92%20Luna%20T--Series-1f6feb.svg)
 &nbsp;![OpenSSL](https://img.shields.io/badge/OpenSSL-3.5-66cc00.svg)
 &nbsp;[![Live demo](https://img.shields.io/badge/demo-live-2ea44f.svg)](https://www.rayketcham.com/CRLs/tailnumber/db/)
+&nbsp;![Checks](https://img.shields.io/badge/documented%20commands-69%20pass%20%C2%B7%200%20fail-2ea44f.svg)
 
 *Prove a file is authentic and untampered — with signatures built to outlive the aircraft and resist quantum computers.*
+
+**[Dashboard](https://www.rayketcham.com/CRLs/tailnumber/db/)** · **[API reference](https://www.rayketcham.com/CRLs/tailnumber/docs)** · **[Quick start](#-quick-start--sign--verify-in-two-commands)** · **[Verify it yourself](#proof--dont-take-our-word-for-it)**
 
 </div>
 
 > **⚠️ Proprietary — closed source.** This is the public overview; the implementation is private and **not distributed**. No rights are granted to use, copy, or deploy — see [`LICENSE`](LICENSE). The **live demo** is open for evaluation. © 2026 rayketcham-lab.
+
+> **Live now** — SoftHSM2 backend, one **RSA-3072** signer, ~50 endpoints. Every command on this page
+> and in [`docs/`](docs/) was executed against the running service on **2026-07-27**: 69 pass, 0 fail.
+> Ask the service what it can do at this moment:
+> `curl -s https://www.rayketcham.com/CRLs/tailnumber/api/v1/algorithms | jq -r '.available_algorithms[]'`
 
 ---
 
@@ -127,14 +135,55 @@ The service is running — evaluate it without any source:
 | | |
 |---|---|
 | **Dashboard** — hash, sign & verify in one page | https://www.rayketcham.com/CRLs/tailnumber/db/ |
-| **API docs** (interactive) | https://www.rayketcham.com/CRLs/tailnumber/docs |
+| **API reference** — three columns, per-endpoint **Try it**, runnable cURL / Python / JS | https://www.rayketcham.com/CRLs/tailnumber/docs |
+| **Swagger UI** | https://www.rayketcham.com/CRLs/tailnumber/docs/swagger |
+| **OpenAPI spec** (JSON) | https://www.rayketcham.com/CRLs/tailnumber/openapi.json |
+| **What's live right now** | https://www.rayketcham.com/CRLs/tailnumber/api/v1/algorithms |
 | **Usage metrics** (JSON) | https://www.rayketcham.com/CRLs/tailnumber/api/v1/metrics |
 
 New to it? Click **ⓘ Instructions** in the dashboard header for a guided walkthrough.
 
+The samples on `/docs` are **real, not illustrative** — the digest is a genuine SHA-256 and the verify
+endpoints ship a signed envelope, so copying the `/verify/authentic` sample and running it returns
+`authentic: true` with the chain and digest checks included. Nothing to substitute first.
+
 **Want to test it yourself?** Follow **[docs/TESTING.md](docs/TESTING.md)** — sign a file, verify the signature, confirm the **file matches its envelope**, and prove **tamper-detection**, all copy-paste. In the dashboard, *Verify an envelope* takes the **original file** and reports **✓ AUTHENTIC** (the file is hashed in your browser, never uploaded).
 
-**Prefer the API?** The service exposes **~50 endpoints** — discovery, keys & trust material, single **and batch** sign/verify, the one-shot **`/verify/authentic`** ("is this file authentic?") check, and audit forensics. Every one is copy-paste in **[docs/API-COMMANDS.md](docs/API-COMMANDS.md)**, or drive them all from a single CLI, **[`examples/tailnumber-api.sh`](examples/tailnumber-api.sh)** (`sign` · `verify` · `sign-batch` · `verify-batch` · `keys` · `chain` · `algorithms` · …). Full interactive spec at [`/docs`](https://www.rayketcham.com/CRLs/tailnumber/docs) · [`/openapi.json`](https://www.rayketcham.com/CRLs/tailnumber/openapi.json). Want proof it all works? **[`examples/verify-all-commands.sh`](examples/verify-all-commands.sh)** runs every documented command against the live service and prints a pass/fail scorecard.
+**Prefer the API?** The service exposes **~50 endpoints** — discovery, keys & trust material, single
+**and batch** sign/verify, the one-shot **`/verify/authentic`** ("is this file authentic?") check, and
+audit forensics. Every one is copy-paste in **[docs/API-COMMANDS.md](docs/API-COMMANDS.md)**, or drive
+the lot from one CLI — **[`examples/tailnumber-api.sh`](examples/tailnumber-api.sh)**:
+
+```bash
+./tailnumber-api.sh keys                          # what's live right now
+./tailnumber-api.sh sign   firmware.bin           # -> firmware.bin.sig.json
+./tailnumber-api.sh verify firmware.bin firmware.bin.sig.json   # => "authentic": true
+```
+
+24 subcommands (`sign` · `verify` · `sign-batch` · `verify-batch` · `keys` · `chain` · `algorithms` ·
+`hash` · `raw` · …) — every one is exercised by the scorecard below.
+
+## Proof — don't take our word for it
+
+Claims are cheap in crypto. Everything here is checkable, and the checks ship in this repo:
+
+| Run this | What it proves | Result on 2026-07-27 |
+|---|---|---|
+| [`examples/verify-all-commands.sh`](examples/verify-all-commands.sh) | Every documented command and CLI subcommand, executed against the live service | **69 pass · 0 fail · 3 by-design N/A** |
+| [`examples/tailnumber-api-roundtrip.sh`](examples/tailnumber-api-roundtrip.sh) | The service's verdict matches **your own OpenSSL**, a tampered byte is rejected, and the signer chains to the root | match, tamper rejected |
+| [`examples/tailnumber-loadtest.sh`](examples/tailnumber-loadtest.sh) | Sustained signing with per-iteration integrity **and** tamper checks | 100 sign + 100 verify, **0 errors, 0 tampers missed** |
+| [`examples/pkcs11-sign-demo.sh`](examples/pkcs11-sign-demo.sh) | Key born in the token, digest signed in the token, verified with the public half — the Luna path in miniature | signature verified |
+
+Signing latency, measured end-to-end through the reverse proxy (sequential loop, so this is
+per-request latency, not a throughput ceiling):
+
+| min | avg | p50 | p95 | max |
+|---|---|---|---|---|
+| 209 ms | 241 ms | 241 ms | **261 ms** | 265 ms |
+
+The three by-design N/A are honest capability limits, not failures: key **export** (`bundle` / `pfx`)
+is refused because SoftHSM keys are non-extractable, and **hybrid** signing needs an ML-DSA key that
+only exists on Luna hardware. See [Project status](#project-status).
 
 ## Features
 
