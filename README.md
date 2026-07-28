@@ -155,6 +155,7 @@ audit forensics. Every one is copy-paste in **[docs/API-COMMANDS.md](docs/API-CO
 the lot from one CLI — **[`examples/tailnumber-api.sh`](examples/tailnumber-api.sh)**:
 
 ```bash
+cd examples
 ./tailnumber-api.sh keys                          # what's live right now
 ./tailnumber-api.sh sign   firmware.bin           # -> firmware.bin.sig.json
 ./tailnumber-api.sh verify firmware.bin firmware.bin.sig.json   # => "authentic": true
@@ -195,11 +196,55 @@ only exists on Luna hardware. See [Project status](#project-status).
 | 🗝️ **Governed keys** | Keys are minted **on-box only** (never via the API), capturing provenance: creator, reason, PMA/TSO approval, DO-178C level. |
 | 📎 **Detached** | Signs a hash, never the file — huge or classified artifacts stay on your side. |
 | 🔓 **Offline-verifiable** | Every proof checks out with nothing but OpenSSL + the public root. |
-| 🔐 **HSM-anchored** | Keys are generated inside the HSM and are non-extractable — they never leave the token. *SoftHSM (software HSM) today; Luna hardware in production.* |
+| 🔐 **HSM-anchored** | Keys are generated inside the token and are non-extractable — export is refused, the public half is served freely. *SoftHSM2 (a **software** HSM) today; Luna T-Series hardware in production — check it yourself: [key protection](#key-protection--softhsm-today-luna-next) · [docs/HSM.md](docs/HSM.md).* |
 | 📜 **Tamper-evident** | Every operation is written to a hash-chained audit log, re-verified on read. |
 | 🔗 **Interoperable** | The envelope is a wrapper, not a lock-in — the same signature bytes and X.509 chain map cleanly onto JWS, COSE, or CMS/PKCS#7. *Emitters are a roadmap item; the mapping is specified in [docs/INTEROP.md](docs/INTEROP.md).* |
 
 *On the live demo today, **RSA-3072** (`rsa3072-pss-sha256` / `rsa3072-pkcs1-sha256`) is the only active algorithm — the demo holds a single RSA-3072 key in SoftHSM2. **RSA-4096**, **ECDSA P-384**, **ML-DSA**, and **hybrid** each require a key of that family and run on Luna **hardware**, not on this demo; asking for one here returns a clear `incompatible with key` error. All of them are exercised end-to-end in the project's acceptance suite — see [Project status](#project-status). List what's live: `curl -s $API/keys | jq -r '.keys[].label'`.*
+
+## Key protection — SoftHSM today, Luna next
+
+**The live demo runs on SoftHSM2, a *software* HSM.** Private keys are PKCS#11 token
+objects marked sensitive and non-extractable, so the API cannot export them — but
+SoftHSM's token database is a file on disk, so this is software protection, not
+hardware. Production targets a **Thales TCT Luna T-Series (T3000)**, FIPS 140-2 Level 3.
+
+Don't take the label's word for it — the service answers the question directly:
+
+```bash
+BASE=https://www.rayketcham.com/CRLs/tailnumber
+curl -s $BASE/api/v1/hsm | jq '.backend.hardware'          # => false   (SoftHSM, not hardware)
+curl -s $BASE/api/v1/hsm | jq -r '.modules[] | "\(.name): present=\(.present) vendor=\(.manufacturer // "-")"'
+curl -s -o /dev/null -w '%{http_code}\n' $BASE/api/v1/keys/tailnumber-codesign-01/bundle   # => 404, non-extractable
+```
+
+`hardware` is derived from the PKCS#11 module actually loaded, not from a setting
+someone types, and each module is reported by the vendor **it** reports — so a SoftHSM
+library can't be dressed up as a Luna client. Export is refused while the *public* half
+is served freely; that asymmetry is the point.
+
+The signer-side evidence panel prints the command that really ran — no key file appears
+in it, because on a PKCS#11 backend there isn't one:
+
+```
+openssl pkeyutl -sign -engine pkcs11 -keyform engine \
+  -inkey "pkcs11:token=tailnumber;object=tailnumber-codesign-01;type=private" …
+```
+
+**Moving to Luna is a config change, not a code change** — both backends are the same
+PKCS#11 code path; you point `[luna] module` at `libCryptoki2_64.so` and `token_label`
+at the partition. A read-only preflight checks the pilot host first (module vendor is
+genuinely Thales/SafeNet, NTLS registered, partition visible, mechanisms present,
+OpenSSL `pkcs11` engine loadable) and the same checklist is published live:
+
+```bash
+curl -s $BASE/api/v1/hsm | jq '.luna_readiness.checklist'
+```
+
+Partition lifecycle — create, role/PED init, activate, rotate, delete — belongs to the
+HSM admin, not to this service. Full detail, including the honest limitations (no FIPS
+validation, no M-of-N, no post-quantum, and where the PIN lives) in
+**[docs/HSM.md](docs/HSM.md)**.
 
 ## Built to outlive the airframe
 
