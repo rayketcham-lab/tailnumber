@@ -20,7 +20,7 @@
 > **⚠️ Proprietary — closed source.** This is the public overview; the implementation is private and **not distributed**. No rights are granted to use, copy, or deploy — see [`LICENSE`](LICENSE). The **live demo** is open for evaluation. © 2026 rayketcham-lab.
 
 > **Live now** — SoftHSM2 backend, one **RSA-3072** signer, ~50 endpoints. Every command on this page
-> and in [`docs/`](docs/) was executed against the running service on **2026-07-27**: 69 pass, 0 fail.
+> and in [`docs/`](docs/) was executed against the running service on **2026-08-03**: 69 pass, 0 fail.
 > Ask the service what it can do at this moment:
 > `curl -s https://www.rayketcham.com/CRLs/tailnumber/api/v1/algorithms | jq -r '.available_algorithms[]'`
 
@@ -166,11 +166,15 @@ cd examples
 
 ## Proof — don't take our word for it
 
-Claims are cheap in crypto. Everything here is checkable, and the checks ship in this repo:
+Claims are cheap in crypto. Everything here is checkable, the checks ship in this repo, and the
+first two run **weekly against the live service** in CI
+([`verify-live`](../../actions/workflows/verify-live.yml)) — so the numbers below are enforced
+rather than asserted, and drift shows up here instead of in front of you.
 
-| Run this | What it proves | Result on 2026-07-27 |
+| Run this | What it proves | Result on 2026-08-03 |
 |---|---|---|
 | [`examples/verify-all-commands.sh`](examples/verify-all-commands.sh) | Every documented command and CLI subcommand, executed against the live service | **69 pass · 0 fail · 3 by-design N/A** |
+| [`examples/verify-docs-samples.py`](examples/verify-docs-samples.py) | Every request sample the [`/docs`](https://www.rayketcham.com/CRLs/tailnumber/docs) page generates — regenerated from `openapi.json` and run. Also fails a sample that returns 200 while rendering a placeholder nobody can copy | **41 ok · 0 fail · 4 by-design N/A** |
 | [`examples/tailnumber-api-roundtrip.sh`](examples/tailnumber-api-roundtrip.sh) | The service's verdict matches **your own OpenSSL**, a tampered byte is rejected, and the signer chains to the root | match, tamper rejected |
 | [`examples/tailnumber-loadtest.sh`](examples/tailnumber-loadtest.sh) | Sustained signing with per-iteration integrity **and** tamper checks | 100 sign + 100 verify, **0 errors, 0 tampers missed** |
 | [`examples/pkcs11-sign-demo.sh`](examples/pkcs11-sign-demo.sh) | Key born in the token, digest signed in the token, verified with the public half — the Luna path in miniature | signature verified |

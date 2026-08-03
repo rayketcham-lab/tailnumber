@@ -1,0 +1,80 @@
+name: verify-live
+
+# The README states a pass count for the documented commands. Nothing enforced it —
+# it was a number someone typed. This runs the same checks the docs tell readers to
+# run, against the live service, on a schedule, so drift shows up here instead of in
+# front of an evaluator.
+#
+# Two surfaces, because they rot independently:
+#   verify-all-commands.sh   — docs/API-COMMANDS.md + the tailnumber-api.sh CLI
+#   verify-docs-samples.py   — the samples the /docs page generates from openapi.json
+#
+# Mutating endpoints are never fired. If the demo is down or a key is rotated this
+# will go red — that is the intent; check the run before assuming the docs are wrong.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"        # Mondays 06:17 UTC
+  workflow_dispatch:
+    inputs:
+      endpoint:
+        description: "Service root to verify (defaults to the live demo)"
+        required: false
+        default: "https://www.rayketcham.com/CRLs/tailnumber"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TN_BASE: ${{ github.event.inputs.endpoint || 'https://www.rayketcham.com/CRLs/tailnumber' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Tooling versions
+        run: |
+          curl --version | head -1
+          jq --version
+          openssl version
+          python3 --version
+
+      # TN_BASE comes from workflow_dispatch input. It is only ever referenced as a
+      # quoted "$TN_BASE" env var (never interpolated into a run: script), but
+      # constrain the shape anyway so a typo fails loudly instead of curling
+      # somewhere unexpected.
+      - name: Validate endpoint
+        run: |
+          case "$TN_BASE" in
+            https://*) ;;
+            *) echo "::error::TN_BASE must be an https URL, got: $TN_BASE"; exit 1 ;;
+          esac
+          printf '%s' "$TN_BASE" | grep -qE '^https://[A-Za-z0-9._~:/?#@!$&()*+,;=%-]+$' \
+            || { echo "::error::TN_BASE contains unexpected characters"; exit 1; }
+          echo "verifying: $TN_BASE"
+
+      - name: Service reachable
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -m 30 "$TN_BASE/healthz")
+          echo "healthz -> $code"
+          [ "$code" = "200" ] || { echo "::error::live service not reachable ($code)"; exit 1; }
+          curl -s -m 30 "$TN_BASE/healthz" | jq .
+
+      - name: Documented commands + CLI
+        working-directory: examples
+        run: TN_ENDPOINT="$TN_BASE/api/v1" bash verify-all-commands.sh
+
+      - name: /docs generated request samples
+        working-directory: examples
+        run: python3 verify-docs-samples.py
+
+      - name: What the service says it can do right now
+        if: always()
+        run: |
+          curl -s -m 30 "$TN_BASE/api/v1/algorithms" | jq '.available_algorithms'
+          curl -s -m 30 "$TN_BASE/api/v1/hsm" | jq '{hardware: .backend.hardware, protection: .backend.protection}'

@@ -16,7 +16,7 @@ KEY=tailnumber-codesign-01     # a signing key that exists — list them any tim
 > backends can change between visits**. If a command 404s on a key label, list what's live
 > (`curl -s $API/keys | jq -r '.keys[].label'`); the authoritative endpoint list is always
 > [`/openapi.json`](https://www.rayketcham.com/CRLs/tailnumber/openapi.json). Last fact-checked
-> end-to-end against the live service on **2026-07-27** (backend: SoftHSM, one RSA-3072 signer):
+> end-to-end against the live service on **2026-08-03** (backend: SoftHSM, one RSA-3072 signer):
 > every command on this page was executed in order, and every subcommand of
 > [`tailnumber-api.sh`](../examples/tailnumber-api.sh) was run.
 
