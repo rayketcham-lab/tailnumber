@@ -1,5 +1,10 @@
 # Testing TailNumber — sign, verify a file, and prove tamper-detection
 
+> **The public demo is retired.** The endpoints below are offline and no longer resolve.
+> These commands were verified against the live service while it ran and are kept as a
+> record; to run them, point `TN_ENDPOINT` / `$API` at your own instance.
+
+
 Copy-paste steps for evaluators. **Only a hash is sent — your file never leaves your machine.**
 Needs: `curl`, `jq`, `openssl`. *(macOS: `base64 -d` → `base64 -D`; `base64 -w0` → `openssl base64 -A`.)*
 

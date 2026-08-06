@@ -1,5 +1,10 @@
 # TailNumber — HSM: what protects the keys, and how to check
 
+> **The public demo is retired.** The endpoints below are offline and no longer resolve.
+> These commands were verified against the live service while it ran and are kept as a
+> record; to run them, point `TN_ENDPOINT` / `$API` at your own instance.
+
+
 Short version: **the live demo runs on SoftHSM2, a *software* HSM.** Private keys are
 PKCS#11 token objects marked sensitive and non-extractable, so the API cannot export
 them — but SoftHSM's token database is a file on disk, so this is software protection,

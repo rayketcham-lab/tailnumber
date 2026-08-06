@@ -1,5 +1,10 @@
 # TailNumber — API command reference
 
+> **The public demo is retired.** The endpoints below are offline and no longer resolve.
+> These commands were verified against the live service while it ran and are kept as a
+> record; to run them, point `TN_ENDPOINT` / `$API` at your own instance.
+
+
 Every useful endpoint with a copy-paste `curl`. **Open for evaluation** — no auth header needed.
 Only a hash is sent for signing; your files never leave your machine. Needs `curl`, `jq`, `openssl`.
 
@@ -103,7 +108,7 @@ curl -s -X POST $API/sign/data -H 'content-type: application/json' -d "$(jq -nc 
 # Substitute your own labels: curl -s $API/keys | jq -r '.keys[].label'
 curl -s -X POST $API/sign/hybrid -H 'content-type: application/json' -d "$(jq -nc \
   --arg c "$KEY" --arg g "sha256=$(openssl dgst -sha256 "$FILE" | awk '{print $NF}')" \
-  '{classical_label:$c, pqc_label:"spec42-mldsa87-01", digest_alg:"sha256", digest:$g}')" | jq .
+  '{classical_label:$c, pqc_label:"example-mldsa87-01", digest_alg:"sha256", digest:$g}')" | jq .
 ```
 
 ## Verify
