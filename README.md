@@ -69,53 +69,66 @@ predecessor's algorithm, issues the next label in the series from the same CA, a
 `predecessor` and `predecessor_retained: true` — refusing with **409** rather than overwriting a
 successor that already exists.
 
-### Why the tiers are sized 55 / 54 / 50
+### The CA lifecycle — 20 / 10 / 3
 
-| Certificate | Valid for | Why |
+**No certificate spans the platform life. A sequence of generations does.**
+
+| Certificate | Valid for | Over a 50-year platform |
 |---|---|---|
-| **Root CA** | **55 years** | Must outlive every issuing CA it certifies |
-| **Issuing CA** | **54 years** | Must outlive every signer it issues |
-| **Signer** | **50 years** | The platform lifetime the signature has to cover |
+| **Root CA** | **20 years** | ~3 generations |
+| **Issuing CA** | **10 years** | ~5 generations, two per root |
+| **Signer** | **3 years** | ~17 generations |
 
-The nesting is the point, not the specific numbers. A signature produced in year 49 under a signer
-valid to year 50 is only checkable if the issuing CA is still valid past that, and the root past
-*that* — a chain is only as long-lived as its shortest remaining link. The gaps between tiers are
-the **overlap window**: room to stand up the next generation and migrate onto it *before* the
-current one lapses, rather than at the moment it does.
+An earlier build issued 55/54/50-year certificates so a single chain covered the whole platform
+life. That is the wrong shape. It makes the root effectively un-rotatable — you never practise the
+one procedure you will eventually depend on — and it stakes fifty years on one key and one
+algorithm, which is precisely the bet post-quantum migration says not to make. Shorter tiers turn
+rotation into routine maintenance instead of a once-in-a-career emergency.
 
-50-year validity also crosses the RFC 5280 year-2049 boundary where `UTCTime` gives way to
-`GeneralizedTime` — a transition that trips a lot of certificate tooling. The pinned OpenSSL 3.5
-and the offline verifier handle post-2049 dates correctly.
+A leaf can never outlive its issuer, so signer certificates sit *well* inside the issuing CA:
+issuance has to stop far enough before the CA lapses that the certificates expire first. Each tier
+is renewed around mid-life, so the successor is established and trusted before the predecessor
+goes anywhere near expiry.
+
+Certificates issued from about 2029 onward will cross the RFC 5280 year-2049 boundary where
+`UTCTime` gives way to `GeneralizedTime` — a transition that trips a lot of certificate tooling.
+The pinned OpenSSL 3.5 and the offline verifier handle post-2049 dates correctly.
 
 ### Rolling the CA — designed, not implemented
 
-This is where the 50 years are actually won or lost, and **the shipped code does not do it**:
-`ensure_ca()` creates a single unversioned root and issuing pair with no notion of generations.
-The intended sequence:
+This is where the 50 years are won or lost, and **the shipped code does not do it**: `ensure_ca()`
+creates a single unversioned root and issuing pair with no notion of generations. With a 20-year
+root, crossing a root generation inside the platform life is no longer hypothetical — it happens
+at least twice. The intended sequence:
 
-1. Generate `tn-root-g2` in the HSM. `tn-root-g1` stays — it must keep validating everything
-   issued under it.
+1. Generate `tn-root-g2` in the HSM around year 10. `tn-root-g1` stays — it must keep validating
+   everything issued under it.
 2. Issue `tn-issuing-g2` from the new root.
 3. **Overlap.** Both generations live at once: new signers come from `g2`, existing signers keep
    chaining to `g1` until they rotate.
 4. Publish a **link certificate** — the new root's public key signed by the old root — so a
    verifier that only trusts `g1` can still build a path to `g2`. Skip this and every relying
    party in the field breaks the day you cut over.
-5. Retire `g1` only once nothing still depends on it, which on a 50-year platform is *long* after
-   `g2` exists.
+5. Retire `g1` only once nothing still depends on it.
 
 ### The other half: expiry ≠ invalid
 
-Rotation keeps *issuance* alive. It does not by itself keep a decades-old signature *verifiable*,
-because a verifier evaluating trust at check time will reject an expired signer even though the
-signature was sound when it was made. The standard answer is a long-term validation profile: an
-RFC 3161 signature timestamp proving the signature existed while the certificate was valid,
-embedded revocation data so verification never needs a long-dead responder, and periodic archival
+Rotation keeps *issuance* alive. It does not keep a decades-old signature *verifiable*, and with
+these lifetimes that is no longer a footnote. A signer certificate lasts 3 years and its issuing CA
+10; a firmware image signed in year 2 and checked in year 30 has an expired signer, an expired
+issuing CA, and quite possibly a retired root. The signature is still cryptographically sound, but
+a verifier evaluating trust at check time will reject it.
+
+Long, deliberately over-provisioned certificates used to paper over this. On a 20/10/3 cycle they
+no longer do, which makes **long-term validation load-bearing rather than optional**: an RFC 3161
+signature timestamp proving the signature existed while its certificate was valid, embedded
+revocation data so verification never needs a long-dead responder, and periodic archival
 timestamps to outrun algorithm decay (JAdES-B-LTA / CAdES-LTA).
 
 **TailNumber ships the sized trust chain, not LTV.** Those attributes are a documented roadmap
 item, not shipped behaviour — see [`docs/INTEROP.md`](docs/INTEROP.md) §7 and
-[`docs/ROTATION.md`](docs/ROTATION.md).
+[`docs/ROTATION.md`](docs/ROTATION.md). Until they exist, treat the 50-year claim as resting on
+rotation discipline plus archived verification evidence, not on the certificates alone.
 
 ## How it works
 
@@ -125,7 +138,7 @@ flowchart LR
   H -->|"only the digest is sent"| S["Sign in the token<br/>key non-extractable"]
   S --> E["Envelope (.sig.json)"]
   E --> V["Verify — offline, OpenSSL only"]
-  R["Root CA · 55y"] --> I["Issuing CA · 54y"] --> L["Signer · 50y"]
+  R["Root CA · 20y"] --> I["Issuing CA · 10y"] --> L["Signer · 3y"]
   I -. certifies .-> S
   V -. chains to .-> R
 ```

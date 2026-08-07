@@ -146,10 +146,10 @@ the FIPS 204 OIDs above. **This is the honest interop gap:** classical algorithm
 
 ---
 
-## 7. Long-term signatures (the 55/54/50-year chain)
+## 7. Long-term signatures (why the 20/10/3 cycle needs them)
 
-TailNumber's decades-long validity ([README → *Key rotation and CA lifetime*](../README.md#key-rotation-and-ca-lifetime--how-the-chain-survives-50-years))
-raises the same problem the *-AdES* families were built to solve: a signature must
+TailNumber's 20/10/3 CA cycle ([README → *Key rotation and CA lifetime*](../README.md#key-rotation-and-ca-lifetime--how-the-chain-survives-50-years))
+raises, in sharper form, the problem the *-AdES* families were built to solve: a signature must
 remain **verifiable** long after the signing certificate expires or the CA is
 retired. The standardized answer is a **long-term validation (LTV)** profile:
 
@@ -160,7 +160,8 @@ retired. The standardized answer is a **long-term validation (LTV)** profile:
 3. **Archival timestamps** — periodically re-timestamp the whole structure to
    outrun algorithm decay. This is **JAdES-B-LTA** (JSON) / **CAdES-LTA** (CMS).
 
-TailNumber today ships the *trust chain* sized for the platform lifetime; a
+Short-lived tiers make this unavoidable rather than theoretical — a signature will
+outlive its whole chain. TailNumber today ships only the rotating trust chain; a
 `profile: "digest-as-message+ltv"` variant would add the timestamp + revocation
 attributes above. Tracked as a roadmap item in §8.
 
