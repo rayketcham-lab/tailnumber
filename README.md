@@ -39,38 +39,83 @@ the public half is served freely. Validated against SoftHSM2; the production tar
 **Thales TCT Luna T-Series (T3000)**, FIPS 140-2 Level 3. Moving between them is a config change,
 not a code change. → [`docs/HSM.md`](docs/HSM.md)
 
-## Key rotation — how the chain survives 50 years
+## Key rotation and CA lifetime — how the chain survives 50 years
 
-Aerospace software must stay verifiable for the life of the airframe. No key lasts that long, so
-**rotation is what carries the trust chain**, not key lifetime.
+An aircraft's software has to stay verifiable for the life of the airframe. The instinct is to
+issue a long certificate and be done, but **a 50-year certificate is not 50 years of trust**. Over
+that horizon you will migrate algorithms (RSA today, ML-DSA tomorrow), replace HSMs and the people
+holding their credentials, and possibly respond to a compromise. Each of those needs a *new key*
+while everything already signed stays verifiable. So the thing that actually carries the chain is
+**rotation** — certificate lifetime just buys the window to rotate inside.
 
-**Rotation mints the next key. It never destroys the previous one.** Every predecessor stays
-resolvable — its certificate still chains, verification still answers for it, and audit entries
-still name a key that exists. Retiring a key is a separate, deliberate act.
+### The rule
+
+**Rotation mints the next key. It never destroys the previous one.**
+
+Every predecessor stays resolvable: its certificate still chains, verification still answers for
+it, and audit entries still name a key that exists. Deleting the outgoing key and reusing its
+label — which is what this service used to do — silently rewrites what every historical envelope
+and audit record points at. Retiring a key is a separate, deliberate act: stop signing with it,
+let its certificate lapse, keep it resolvable.
 
 | Kind | Pattern | Example |
 |---|---|---|
 | Signing key | `<name>-<seq>` | `tailnumber-codesign-01` → `-02` |
 | CA generation | `<name>-g<N>` | `tn-root-g1` → `tn-root-g2` |
 
-Padding is preserved so labels sort lexically, widening only on overflow (`-99` → `-100`).
+Padding is preserved so labels sort lexically, widening only on overflow (`-99` → `-100`); an
+unsuffixed label is generation 1 by convention. `POST /api/v1/keys/{label}/rotate` reads the
+predecessor's algorithm, issues the next label in the series from the same CA, and returns it with
+`predecessor` and `predecessor_retained: true` — refusing with **409** rather than overwriting a
+successor that already exists.
 
-Each tier is sized to outlive the one below, which is what leaves an overlap window to rotate
-inside:
+### Why the tiers are sized 55 / 54 / 50
 
-| Certificate | Valid for |
-|---|---|
-| Root CA | **55 years** |
-| Issuing CA | **54 years** |
-| Signer | **50 years** |
+| Certificate | Valid for | Why |
+|---|---|---|
+| **Root CA** | **55 years** | Must outlive every issuing CA it certifies |
+| **Issuing CA** | **54 years** | Must outlive every signer it issues |
+| **Signer** | **50 years** | The platform lifetime the signature has to cover |
 
-50-year validity crosses the RFC 5280 year-2049 `UTCTime`→`GeneralizedTime` boundary that trips a
-lot of tooling; the pinned OpenSSL 3.5 and the offline verifier handle it.
+The nesting is the point, not the specific numbers. A signature produced in year 49 under a signer
+valid to year 50 is only checkable if the issuing CA is still valid past that, and the root past
+*that* — a chain is only as long-lived as its shortest remaining link. The gaps between tiers are
+the **overlap window**: room to stand up the next generation and migrate onto it *before* the
+current one lapses, rather than at the moment it does.
 
-**CA rotation is designed, not implemented.** Generational roots with an overlap period and a
-**link certificate** (new root signed by the old) are what let existing relying parties keep
-building a path across a cutover. The shipped code creates a single unversioned root and issuing
-pair with no notion of generations. → [`docs/ROTATION.md`](docs/ROTATION.md)
+50-year validity also crosses the RFC 5280 year-2049 boundary where `UTCTime` gives way to
+`GeneralizedTime` — a transition that trips a lot of certificate tooling. The pinned OpenSSL 3.5
+and the offline verifier handle post-2049 dates correctly.
+
+### Rolling the CA — designed, not implemented
+
+This is where the 50 years are actually won or lost, and **the shipped code does not do it**:
+`ensure_ca()` creates a single unversioned root and issuing pair with no notion of generations.
+The intended sequence:
+
+1. Generate `tn-root-g2` in the HSM. `tn-root-g1` stays — it must keep validating everything
+   issued under it.
+2. Issue `tn-issuing-g2` from the new root.
+3. **Overlap.** Both generations live at once: new signers come from `g2`, existing signers keep
+   chaining to `g1` until they rotate.
+4. Publish a **link certificate** — the new root's public key signed by the old root — so a
+   verifier that only trusts `g1` can still build a path to `g2`. Skip this and every relying
+   party in the field breaks the day you cut over.
+5. Retire `g1` only once nothing still depends on it, which on a 50-year platform is *long* after
+   `g2` exists.
+
+### The other half: expiry ≠ invalid
+
+Rotation keeps *issuance* alive. It does not by itself keep a decades-old signature *verifiable*,
+because a verifier evaluating trust at check time will reject an expired signer even though the
+signature was sound when it was made. The standard answer is a long-term validation profile: an
+RFC 3161 signature timestamp proving the signature existed while the certificate was valid,
+embedded revocation data so verification never needs a long-dead responder, and periodic archival
+timestamps to outrun algorithm decay (JAdES-B-LTA / CAdES-LTA).
+
+**TailNumber ships the sized trust chain, not LTV.** Those attributes are a documented roadmap
+item, not shipped behaviour — see [`docs/INTEROP.md`](docs/INTEROP.md) §7 and
+[`docs/ROTATION.md`](docs/ROTATION.md).
 
 ## How it works
 
@@ -100,7 +145,11 @@ Runnable examples are in [`examples/`](examples/). They target a TailNumber endp
   disk — software protection. No FIPS validation, no M-of-N quorum, no tamper response.
 - **No post-quantum on the retired demo.** ML-DSA is implemented and covered by the acceptance
   suite, but SoftHSM has no PQC mechanisms; ML-DSA and hybrid need Luna firmware 7.15.0.
-- **CA generation rollover is unbuilt** (above).
+- **CA generation rollover is unbuilt** (above) — signing-key rotation is implemented; generational
+  roots, the overlap period and the link certificate are design only.
+- **No long-term validation.** No RFC 3161 timestamps, no embedded revocation data, no archival
+  re-timestamping — so a strict verifier will reject a signature once its signer certificate
+  expires, even though the signature itself is sound.
 - **Luna steps are written against the SDK docs**, not exercised against hardware.
 
 ## License

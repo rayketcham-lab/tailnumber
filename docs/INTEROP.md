@@ -148,7 +148,7 @@ the FIPS 204 OIDs above. **This is the honest interop gap:** classical algorithm
 
 ## 7. Long-term signatures (the 55/54/50-year chain)
 
-TailNumber's decades-long validity ([README → *Built to outlive the airframe*](../README.md))
+TailNumber's decades-long validity ([README → *Key rotation and CA lifetime*](../README.md#key-rotation-and-ca-lifetime--how-the-chain-survives-50-years))
 raises the same problem the *-AdES* families were built to solve: a signature must
 remain **verifiable** long after the signing certificate expires or the CA is
 retired. The standardized answer is a **long-term validation (LTV)** profile:
