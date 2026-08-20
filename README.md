@@ -223,6 +223,10 @@ OSSL=/path/to/openssl-3.5 ./examples/openssl-detached-offline.sh --alg ml-dsa-65
 That is the honest boundary of what this service is: convenience, custody and governance around a
 signature you could have made yourself, in a format you can still check when the service is gone.
 
+**[docs/OPENSSL.md](docs/OPENSSL.md)** is the long-form version: the envelope annotated field by
+field, each verification step with its real output, what a tampered artifact / wrong flags / forged
+certificate actually print, and how to produce an envelope from scratch with no service involved.
+
 
 ## TL;DR
 
@@ -561,7 +565,8 @@ Because an aircraft's software must stay verifiable for the life of the aircraft
 ## Documentation
 
 [Key rotation](docs/ROTATION.md) · [HSM & Luna](docs/HSM.md) · [API commands](docs/API-COMMANDS.md) ·
-[Formats & interoperability](docs/INTEROP.md) · [Tech stack](docs/STACK.md) · [Testing](docs/TESTING.md)
+[**OpenSSL by hand**](docs/OPENSSL.md) · [Formats & interoperability](docs/INTEROP.md) ·
+[Tech stack](docs/STACK.md) · [Testing](docs/TESTING.md)
 
 Runnable examples are in [`examples/`](examples/). They target the live demo by default and any
 other TailNumber instance via `TN_ENDPOINT` — except
