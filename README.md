@@ -209,6 +209,20 @@ openssl pkeyutl -verify -pubin -inkey signer.pub -in digest2.bin -sigfile sig.bi
 The same flip makes step ④ fail and `/verify/authentic` return `"authentic": false`. A signature is
 only as good as its refusal to validate the wrong thing.
 
+**No service at all?** [`examples/openssl-detached-offline.sh`](examples/openssl-detached-offline.sh)
+runs this entire lifecycle with only OpenSSL and `jq` — it builds a throwaway CA, issues a
+code-signing certificate, signs a digest, writes an envelope in the same format the service emits,
+verifies it offline, and proves tamper-rejection. Nothing is contacted, nothing is installed:
+
+```bash
+./examples/openssl-detached-offline.sh                          # rsa3072-pss-sha256
+./examples/openssl-detached-offline.sh --alg ecdsa-p384-sha384
+OSSL=/path/to/openssl-3.5 ./examples/openssl-detached-offline.sh --alg ml-dsa-65
+```
+
+That is the honest boundary of what this service is: convenience, custody and governance around a
+signature you could have made yourself, in a format you can still check when the service is gone.
+
 
 ## TL;DR
 
@@ -309,6 +323,7 @@ rather than asserted, and drift shows up here instead of in front of you.
 | [`examples/tailnumber-api-roundtrip.sh`](examples/tailnumber-api-roundtrip.sh) | The service's verdict matches **your own OpenSSL**, a tampered byte is rejected, and the signer chains to the root | match, tamper rejected |
 | [`examples/tailnumber-loadtest.sh`](examples/tailnumber-loadtest.sh) | Sustained signing with per-iteration integrity **and** tamper checks | 100 sign + 100 verify, **0 errors, 0 tampers missed** |
 | [`examples/pkcs11-sign-demo.sh`](examples/pkcs11-sign-demo.sh) | Key born in the token, digest signed in the token, verified with the public half — the Luna path in miniature | signature verified |
+| [`examples/openssl-detached-offline.sh`](examples/openssl-detached-offline.sh) | The **entire** lifecycle — CA, issue, sign a digest, envelope, verify, tamper — with **no service at all**: OpenSSL and `jq`, nothing else | 12/12 on each of 5 algorithm profiles |
 
 Signing latency, measured end-to-end through the reverse proxy (sequential loop, so this is
 per-request latency, not a throughput ceiling):
@@ -549,7 +564,9 @@ Because an aircraft's software must stay verifiable for the life of the aircraft
 [Formats & interoperability](docs/INTEROP.md) · [Tech stack](docs/STACK.md) · [Testing](docs/TESTING.md)
 
 Runnable examples are in [`examples/`](examples/). They target the live demo by default and any
-other TailNumber instance via `TN_ENDPOINT`.
+other TailNumber instance via `TN_ENDPOINT` — except
+[`openssl-detached-offline.sh`](examples/openssl-detached-offline.sh), which is entirely
+self-contained and needs no service at all.
 
 ## Source
 
