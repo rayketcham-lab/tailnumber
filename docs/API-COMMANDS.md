@@ -1,10 +1,5 @@
 # TailNumber — API command reference
 
-> **The public demo is retired.** The endpoints below are offline and no longer resolve.
-> These commands were verified against the live service while it ran and are kept as a
-> record; to run them, point `TN_ENDPOINT` / `$API` at your own instance.
-
-
 Every useful endpoint with a copy-paste `curl`. **Open for evaluation** — no auth header needed.
 Only a hash is sent for signing; your files never leave your machine. Needs `curl`, `jq`, `openssl`.
 
