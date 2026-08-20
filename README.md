@@ -20,8 +20,9 @@
 > **⚠️ Proprietary — closed source.** This is the public overview; the implementation is private and **not distributed**. No rights are granted to use, copy, or deploy — see [`LICENSE`](LICENSE). The **live demo** is open for evaluation. © 2026 rayketcham-lab.
 
 > **Live** — SoftHSM2 backend, one **RSA-3072** signer, ~50 endpoints. Every command on this page and
-> in [`docs/`](docs/) is executed, not asserted: 69 pass / 0 fail against the live service
-> (**2026-08-03**), and re-audited from scratch on **2026-08-20** — see [Proof](#proof--dont-take-our-word-for-it).
+> in [`docs/`](docs/) is executed, not asserted: **69 pass / 0 fail** against the live service, last
+> run **2026-08-20** — see [Proof](#proof--dont-take-our-word-for-it). Ask the service what it can do
+> at this moment: `curl -s $API/algorithms | jq -r '.available_algorithms[]'`
 > Ask the service what it can do at this moment:
 > `curl -s https://www.rayketcham.com/CRLs/tailnumber/api/v1/algorithms | jq -r '.available_algorithms[]'`
 
@@ -301,7 +302,7 @@ first two run **weekly against the live service** in CI
 ([`verify-live`](../../actions/workflows/verify-live.yml)) — so the numbers below are enforced
 rather than asserted, and drift shows up here instead of in front of you.
 
-| Run this | What it proves | Result (2026-08-03, live service) |
+| Run this | What it proves | Result (2026-08-20, live service) |
 |---|---|---|
 | [`examples/verify-all-commands.sh`](examples/verify-all-commands.sh) | Every documented command and CLI subcommand, executed against the live service | **69 pass · 0 fail · 3 by-design N/A** |
 | [`examples/verify-docs-samples.py`](examples/verify-docs-samples.py) | Every request sample the [`/docs`](https://www.rayketcham.com/CRLs/tailnumber/docs) page generates — regenerated from `openapi.json` and run. Also fails a sample that returns 200 while rendering a placeholder nobody can copy | **41 ok · 0 fail · 4 by-design N/A** |
@@ -316,18 +317,16 @@ per-request latency, not a throughput ceiling):
 |---|---|---|---|---|
 | 209 ms | 241 ms | 241 ms | **261 ms** | 265 ms |
 
-**Re-audited 2026-08-20** on a clean instance built from scratch, carrying **all four algorithm
-families** rather than the single RSA-3072 key the live demo holds:
+Everything above was re-run against the live service on **2026-08-20**: **69 pass / 0 fail / 3 N/A**
+and **41 ok / 0 fail / 4 N/A**, plus **18 of 18** steps of the
+[walkthrough above](#step-by-step--sign-through-the-api-verify-with-nothing-but-openssl) on both live
+RSA profiles — signed in the token, verified offline with OpenSSL alone, chained to the root, tampered
+digest rejected.
 
-- **70 of 71 documented commands pass.** The one exception is `bundle`, which returns `200` on an
-  extractable PFX keystore where the demo's non-extractable SoftHSM keys correctly return `404` — a
-  backend difference, not a defect.
-- **44 of 44** `/docs` request samples execute clean (5 mutating endpoints are never fired).
-- **45 of 45** steps of the [walkthrough above](#step-by-step--sign-through-the-api-verify-with-nothing-but-openssl),
-  run across **5 algorithm profiles** — RSA-PSS, RSA-PKCS#1, ECDSA P-384, ML-DSA-65 and ML-DSA-87 —
-  each signing through the API, verifying offline with OpenSSL alone, chaining to the root, and
-  **rejecting a tampered digest**.
-- **61 of 61** in the private repo's hermetic acceptance suite.
+The demo holds one RSA-3072 key, so the other algorithm families cannot be exercised here. They were
+audited the same day on a clean instance carrying all four: **45 of 45** walkthrough steps across
+**5 profiles** (RSA-PSS, RSA-PKCS#1, ECDSA P-384, ML-DSA-65, ML-DSA-87), **44 of 44** `/docs` samples,
+and **61 of 61** in the private repo's hermetic acceptance suite.
 
 The three by-design N/A are honest capability limits, not failures: key **export** (`bundle` / `pfx`)
 is refused because SoftHSM keys are non-extractable, and **hybrid** signing needs an ML-DSA key that
